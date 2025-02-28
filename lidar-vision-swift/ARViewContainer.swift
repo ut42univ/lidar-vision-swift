@@ -2,9 +2,10 @@ import SwiftUI
 import ARKit
 import RealityKit
 
+// ② ARViewをSwiftUIでラップする
 struct ARViewContainer: UIViewRepresentable {
     @ObservedObject var depthData: DepthData
-    
+
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
         let configuration = ARWorldTrackingConfiguration()
@@ -17,7 +18,7 @@ struct ARViewContainer: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: ARView, context: Context) {
-        // 必要に応じて更新処理
+        // 必要に応じた更新処理
     }
     
     func makeCoordinator() -> Coordinator {
@@ -42,7 +43,7 @@ struct ARViewContainer: UIViewRepresentable {
                 let centerIndex = (height / 2) * width + (width / 2)
                 let depthAtCenter = floatBuffer[centerIndex]
                 CVPixelBufferUnlockBaseAddress(depthMap, .readOnly)
-                // SwiftUIの状態を更新する
+                // メインスレッドでSwiftUIの状態を更新
                 DispatchQueue.main.async {
                     self.depthData.centerDepth = depthAtCenter
                 }
@@ -52,3 +53,4 @@ struct ARViewContainer: UIViewRepresentable {
         }
     }
 }
+
