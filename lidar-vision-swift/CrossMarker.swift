@@ -7,17 +7,17 @@
 
 import SwiftUI
 
-// 画面中央に配置するクロスマーカー
+// クロスマーカーは色を引数で指定（白／黄色／赤）
 struct CrossMarker: View {
-    var isTooClose: Bool
+    var color: Color = .white
     
     var body: some View {
         ZStack {
             Rectangle()
-                .fill(isTooClose ? Color.red : Color.white)
+                .fill(color)
                 .frame(width: 40, height: 2)
             Rectangle()
-                .fill(isTooClose ? Color.red : Color.white)
+                .fill(color)
                 .frame(width: 2, height: 40)
         }
     }

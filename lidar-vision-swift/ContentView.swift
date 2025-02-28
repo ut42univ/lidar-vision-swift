@@ -8,26 +8,47 @@
 import SwiftUI
 import AudioToolbox
 
-// ContentView：AR映像、クロスマーカー、警告オーバーレイ、連続的な触覚・音声フィードバック、サウンド切替ボタンを実装
 struct ContentView: View {
     @StateObject var depthData = DepthData()
-    // 閾値（単位：メートル）
-    let threshold: Float = 0.5
-    // 触覚フィードバック用タイマー
-    @State private var hapticTimer: Timer? = nil
-    // 音声フィードバック用タイマー
-    @State private var soundTimer: Timer? = nil
+    @StateObject var feedbackManager = FeedbackManager()
+    
+    // 警告レベルの閾値（単位：メートル）
+    let warningThreshold: Float = 1.0
+    let criticalThreshold: Float = 0.5
+    
     // サウンドの有効／無効を管理するフラグ（ボタンで切替）
     @State private var soundEnabled: Bool = true
-
+    
+    // 現在の警告レベルに応じたクロスマーカーの色
+    var alertColor: Color {
+        if depthData.centerDepth < criticalThreshold {
+            return .red
+        } else if depthData.centerDepth < warningThreshold {
+            return .yellow
+        } else {
+            return .white
+        }
+    }
+    
+    // オーバーレイの色（警告レベルに応じた半透明色）
+    var overlayColor: Color? {
+        if depthData.centerDepth < criticalThreshold {
+            return Color.red.opacity(0.2)
+        } else if depthData.centerDepth < warningThreshold {
+            return Color.yellow.opacity(0.2)
+        } else {
+            return nil
+        }
+    }
+    
     var body: some View {
         ZStack {
             ARViewContainer(depthData: depthData)
                 .edgesIgnoringSafeArea(.all)
             
-            // 警告用の赤いオーバーレイ
-            if depthData.centerDepth < threshold {
-                Color.red.opacity(0.2)
+            // 警告用オーバーレイ
+            if let overlayColor = overlayColor {
+                overlayColor
                     .edgesIgnoringSafeArea(.all)
                     .transition(.opacity)
             }
@@ -35,7 +56,7 @@ struct ContentView: View {
             VStack {
                 HStack {
                     Spacer()
-                    // サウンドのオン／オフ切替ボタン
+                    // サウンド切替ボタン
                     Button(action: {
                         soundEnabled.toggle()
                     }) {
@@ -57,65 +78,44 @@ struct ContentView: View {
                     .padding(.bottom, 20)
             }
         }
-        // 中央にクロスマーカーを配置
+        // 画面中央にクロスマーカーをoverlayで配置
         .overlay(
-            CrossMarker(isTooClose: depthData.centerDepth < threshold)
+            CrossMarker(color: alertColor)
                 .frame(width: 40, height: 40),
             alignment: .center
         )
-        // iOS 17仕様の onChange（新しい値とTransactionの2パラメータ版）
+        // 深度変化に応じたフィードバックの開始／停止（iOS 17仕様のonChange）
         .onChange(of: depthData.centerDepth) { newDepth, _ in
-            if newDepth < threshold {
-                startHapticTimer()
+            if newDepth < criticalThreshold {
+                // 警告レベル2：Critical
+                feedbackManager.stopWarningHapticFeedback()
+                feedbackManager.startCriticalHapticFeedback()
+                feedbackManager.stopWarningSound()
                 if soundEnabled {
-                    startSoundTimer()
+                    feedbackManager.startCriticalSound()
                 } else {
-                    stopSoundTimer()
+                    feedbackManager.stopCriticalSound()
+                }
+            } else if newDepth < warningThreshold {
+                // 警告レベル1：Warning
+                feedbackManager.stopCriticalHapticFeedback()
+                feedbackManager.startWarningHapticFeedback()
+                feedbackManager.stopCriticalSound()
+                if soundEnabled {
+                    feedbackManager.startWarningSound()
+                } else {
+                    feedbackManager.stopWarningSound()
                 }
             } else {
-                stopHapticTimer()
-                stopSoundTimer()
+                // 安全域：すべて停止
+                feedbackManager.stopAll()
             }
         }
         .onDisappear {
-            stopHapticTimer()
-            stopSoundTimer()
+            feedbackManager.stopAll()
         }
-    }
-    
-    // 触覚フィードバックタイマーの開始
-    func startHapticTimer() {
-        if hapticTimer == nil {
-            hapticTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                let generator = UIImpactFeedbackGenerator(style: .heavy)
-                generator.impactOccurred()
-            }
-        }
-    }
-    
-    // 触覚フィードバックタイマーの停止
-    func stopHapticTimer() {
-        hapticTimer?.invalidate()
-        hapticTimer = nil
-    }
-    
-    // 音声フィードバックタイマーの開始（システムサウンドでビープ音）
-    func startSoundTimer() {
-        if soundTimer == nil {
-            soundTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in
-                // ここではシステムサウンドID 1255（例: 軽いビープ音）を再生
-                AudioServicesPlaySystemSound(SystemSoundID(1255))
-            }
-        }
-    }
-    
-    // 音声フィードバックタイマーの停止
-    func stopSoundTimer() {
-        soundTimer?.invalidate()
-        soundTimer = nil
     }
 }
-
 
 
 #Preview {
