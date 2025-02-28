@@ -15,10 +15,10 @@ struct CrossMarker: View {
         ZStack {
             Rectangle()
                 .fill(color)
-                .frame(width: 40, height: 4)
+                .frame(width: 20, height: 2)
             Rectangle()
                 .fill(color)
-                .frame(width: 4, height: 40)
+                .frame(width: 2, height: 20)
         }
     }
 }

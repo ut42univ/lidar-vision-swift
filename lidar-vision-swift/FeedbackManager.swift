@@ -50,7 +50,7 @@ final class FeedbackManager: ObservableObject {
     // 警告レベル1用サウンド（例：SystemSoundID 1006）を開始
     func startWarningSound() {
         if warningSoundTimer == nil {
-            warningSoundTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+            warningSoundTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
                 AudioServicesPlaySystemSound(SystemSoundID(1255))
             }
         }
@@ -64,7 +64,7 @@ final class FeedbackManager: ObservableObject {
     // 警告レベル2用サウンド（例：SystemSoundID 1005）を開始
     func startCriticalSound() {
         if criticalSoundTimer == nil {
-            criticalSoundTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { _ in
+            criticalSoundTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
                 AudioServicesPlaySystemSound(SystemSoundID(1256))
             }
         }
