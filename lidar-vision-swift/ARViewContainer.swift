@@ -2,7 +2,7 @@ import SwiftUI
 import ARKit
 import RealityKit
 
-// ② ARViewをSwiftUIでラップする
+// ARViewをSwiftUIに統合するビュー
 struct ARViewContainer: UIViewRepresentable {
     @ObservedObject var depthData: DepthData
 
@@ -53,4 +53,3 @@ struct ARViewContainer: UIViewRepresentable {
         }
     }
 }
-
