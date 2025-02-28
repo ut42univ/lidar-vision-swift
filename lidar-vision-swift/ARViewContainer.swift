@@ -2,16 +2,19 @@ import SwiftUI
 import ARKit
 import RealityKit
 
-// ARViewをSwiftUIに統合するビュー
+// A SwiftUI view wrapper for integrating ARView
 struct ARViewContainer: UIViewRepresentable {
     @ObservedObject var depthData: DepthData
     
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
         let configuration = ARWorldTrackingConfiguration()
+        
+        // Enable scene depth if supported
         if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
             configuration.frameSemantics.insert(.sceneDepth)
         }
+        
         arView.session.run(configuration)
         arView.session.delegate = context.coordinator
         return arView
@@ -23,6 +26,7 @@ struct ARViewContainer: UIViewRepresentable {
         Coordinator(depthData: depthData)
     }
     
+    // AR session delegate handling depth data processing
     class Coordinator: NSObject, ARSessionDelegate {
         var depthData: DepthData
         let ciContext = CIContext()
@@ -34,13 +38,16 @@ struct ARViewContainer: UIViewRepresentable {
         func session(_ session: ARSession, didUpdate frame: ARFrame) {
             guard let sceneDepth = frame.sceneDepth else { return }
             let depthMap = sceneDepth.depthMap
+            
+            // Get depth map dimensions
             let width = CVPixelBufferGetWidth(depthMap)
             let height = CVPixelBufferGetHeight(depthMap)
             
+            // Lock buffer for reading
             CVPixelBufferLockBaseAddress(depthMap, .readOnly)
             defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
             
-            // 中心深度の取得
+            // Extract center depth value
             if let baseAddress = CVPixelBufferGetBaseAddress(depthMap) {
                 let floatBuffer = baseAddress.assumingMemoryBound(to: Float32.self)
                 let centerIndex = (height / 2) * width + (width / 2)
@@ -50,7 +57,7 @@ struct ARViewContainer: UIViewRepresentable {
                 }
             }
             
-            // Depth Mapを疑似カラー画像に変換して更新
+            // Convert depth map to color overlay
             if let overlayImage = self.imageFromPixelBuffer(depthMap) {
                 DispatchQueue.main.async {
                     self.depthData.depthOverlayImage = overlayImage
@@ -58,14 +65,20 @@ struct ARViewContainer: UIViewRepresentable {
             }
         }
         
-        func imageFromPixelBuffer(_ pixelBuffer: CVPixelBuffer) -> UIImage? {
+        // Convert CVPixelBuffer to pseudo-colored UIImage
+        private func imageFromPixelBuffer(_ pixelBuffer: CVPixelBuffer) -> UIImage? {
             let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
             guard let falseColorFilter = CIFilter(name: "CIFalseColor") else { return nil }
+            
             falseColorFilter.setValue(ciImage, forKey: kCIInputImageKey)
             falseColorFilter.setValue(CIColor(red: 0, green: 0, blue: 1), forKey: "inputColor0")
             falseColorFilter.setValue(CIColor(red: 1, green: 0, blue: 0), forKey: "inputColor1")
-            guard let outputImage = falseColorFilter.outputImage else { return nil }
-            guard let cgImage = ciContext.createCGImage(outputImage, from: outputImage.extent) else { return nil }
+            
+            guard let outputImage = falseColorFilter.outputImage,
+                  let cgImage = ciContext.createCGImage(outputImage, from: outputImage.extent) else {
+                return nil
+            }
+            
             return UIImage(cgImage: cgImage)
         }
     }

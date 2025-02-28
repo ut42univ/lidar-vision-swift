@@ -1,13 +1,6 @@
-//
-//  CrossMarker.swift
-//  lidar-vision-swift
-//
-//  Created by Takuya Uehara on 2025/02/28.
-//
-
 import SwiftUI
 
-// クロスマーカーは色を引数で指定（白／黄色／赤）
+// Crosshair marker with customizable color
 struct CrossMarker: View {
     var color: Color = .white
     
