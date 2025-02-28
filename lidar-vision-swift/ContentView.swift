@@ -8,16 +8,15 @@
 import SwiftUI
 
 struct ContentView: View {
-    // 計測値を保持する@State変数（Coordinator内で更新する仕組みを後ほど実装）
-    @State private var measuredDistance: Float = 0.0
+    @StateObject var depthData = DepthData()
     
     var body: some View {
         ZStack {
-            ARViewContainer() // ARの映像を全画面に表示
+            ARViewContainer(depthData: depthData)
                 .edgesIgnoringSafeArea(.all)
             VStack {
                 Spacer()
-                Text(String(format: "Depth of Center: %.2f m", measuredDistance))
+                Text(String(format: "距離: %.2f m", depthData.centerDepth))
                     .padding()
                     .background(Color.black.opacity(0.5))
                     .foregroundColor(.white)
@@ -25,9 +24,9 @@ struct ContentView: View {
                     .padding(.bottom, 20)
             }
         }
-        // Coordinatorからの距離更新を受け取る仕組みを実装することも検討（例：Combineやdelegateパターン）
     }
 }
+
 
 
 #Preview {
