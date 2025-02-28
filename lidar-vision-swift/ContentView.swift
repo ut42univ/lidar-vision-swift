@@ -12,14 +12,12 @@ struct ContentView: View {
     @StateObject var depthData = DepthData()
     @StateObject var feedbackManager = FeedbackManager()
     
-    // 警告レベルの閾値（単位：メートル）
+    // 警告レベルの閾値
     let warningThreshold: Float = 1.0
     let criticalThreshold: Float = 0.5
-    
-    // サウンドの有効／無効を管理するフラグ（ボタンで切替）
+    // サウンドの有効／無効を管理するフラグ
     @State private var soundEnabled: Bool = true
     
-    // 現在の警告レベルに応じたクロスマーカーの色
     var alertColor: Color {
         if depthData.centerDepth < criticalThreshold {
             return .red
@@ -30,7 +28,6 @@ struct ContentView: View {
         }
     }
     
-    // オーバーレイの色（警告レベルに応じた半透明色）
     var overlayColor: Color? {
         if depthData.centerDepth < criticalThreshold {
             return Color.red.opacity(0.2)
@@ -46,29 +43,23 @@ struct ContentView: View {
             ARViewContainer(depthData: depthData)
                 .edgesIgnoringSafeArea(.all)
             
-            // 警告用オーバーレイ
-            if let overlayColor = overlayColor {
-                overlayColor
-                    .edgesIgnoringSafeArea(.all)
-                    .transition(.opacity)
+            // pip形式でDepth Mapを右上に表示
+            if let depthImage = depthData.depthOverlayImage {
+                Image(uiImage: depthImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .rotationEffect(Angle(degrees: 90)) // 時計回りに90°回転（必要に応じて調整）
+                    .frame(width: 150, height: 150)
+                    .cornerRadius(4)
+                    .padding(4)
+                    .background(Color.black.opacity(0.7))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
             
+            // 下部に深度値表示
             VStack {
-                HStack {
-                    Spacer()
-                    // サウンド切替ボタン
-                    Button(action: {
-                        soundEnabled.toggle()
-                    }) {
-                        Image(systemName: soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                            .font(.system(size: 24))
-                            .padding()
-                            .background(Color.black.opacity(0.5))
-                            .foregroundColor(.white)
-                            .clipShape(Circle())
-                    }
-                    .padding()
-                }
                 Spacer()
                 Text(String(format: "距離: %.2f m", depthData.centerDepth))
                     .padding()
@@ -77,17 +68,35 @@ struct ContentView: View {
                     .cornerRadius(8)
                     .padding(.bottom, 20)
             }
+            
+            // 警告用オーバーレイ（必要に応じて）
+            if let overlayColor = overlayColor {
+                overlayColor
+                    .edgesIgnoringSafeArea(.all)
+                    .transition(.opacity)
+            }
         }
-        // 画面中央にクロスマーカーをoverlayで配置
+        // 画面中央にクロスマーカーを配置
         .overlay(
             CrossMarker(color: alertColor)
                 .frame(width: 40, height: 40),
             alignment: .center
         )
-        // 深度変化に応じたフィードバックの開始／停止（iOS 17仕様のonChange）
+        // サウンド切替ボタンを左上に配置
+        .overlay(
+            Button(action: { soundEnabled.toggle() }) {
+                Image(systemName: soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                    .font(.system(size: 24))
+                    .padding()
+                    .background(Color.black.opacity(0.5))
+                    .foregroundColor(.white)
+                    .clipShape(Circle())
+            }
+            .padding(),
+            alignment: .topLeading
+        )
         .onChange(of: depthData.centerDepth) { newDepth, _ in
             if newDepth < criticalThreshold {
-                // 警告レベル2：Critical
                 feedbackManager.stopWarningHapticFeedback()
                 feedbackManager.startCriticalHapticFeedback()
                 feedbackManager.stopWarningSound()
@@ -97,7 +106,6 @@ struct ContentView: View {
                     feedbackManager.stopCriticalSound()
                 }
             } else if newDepth < warningThreshold {
-                // 警告レベル1：Warning
                 feedbackManager.stopCriticalHapticFeedback()
                 feedbackManager.startWarningHapticFeedback()
                 feedbackManager.stopCriticalSound()
@@ -107,7 +115,6 @@ struct ContentView: View {
                     feedbackManager.stopWarningSound()
                 }
             } else {
-                // 安全域：すべて停止
                 feedbackManager.stopAll()
             }
         }
@@ -116,7 +123,6 @@ struct ContentView: View {
         }
     }
 }
-
 
 #Preview {
     ContentView()

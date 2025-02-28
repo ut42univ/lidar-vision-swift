@@ -7,8 +7,10 @@
 
 
 import Combine
+import UIKit
 
 // 深度情報を保持するObservableObject
 class DepthData: ObservableObject {
     @Published var centerDepth: Float = 0.0
+    @Published var depthOverlayImage: UIImage? = nil
 }
