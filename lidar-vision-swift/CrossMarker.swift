@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Crosshair marker with customizable color
+// Crosshair marker view with customizable color
 struct CrossMarker: View {
     var color: Color = .white
     

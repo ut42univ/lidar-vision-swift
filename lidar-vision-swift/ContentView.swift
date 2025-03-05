@@ -1,39 +1,17 @@
 import SwiftUI
 import AudioToolbox
 
+// Main content view that renders the AR experience and feedback UI
 struct ContentView: View {
-    @StateObject var depthData = DepthData()
-    @StateObject var feedbackManager = FeedbackManager()
-    
-    // Depth threshold values
-    private let warningThreshold: Float = 1.0
-    private let criticalThreshold: Float = 0.5
-    
-    @State private var soundEnabled: Bool = false
-    
-    private var alertColor: Color {
-        switch depthData.centerDepth {
-        case ..<criticalThreshold: return .red
-        case ..<warningThreshold: return .yellow
-        default: return .white
-        }
-    }
-    
-    private var overlayColor: Color? {
-        switch depthData.centerDepth {
-        case ..<criticalThreshold: return Color.red.opacity(0.2)
-        case ..<warningThreshold: return Color.yellow.opacity(0.2)
-        default: return nil
-        }
-    }
+    @StateObject var viewModel = ContentViewModel()
     
     var body: some View {
         ZStack {
-            ARViewContainer(depthData: depthData)
+            ARViewContainer(sessionManager: viewModel.sessionManager)
                 .edgesIgnoringSafeArea(.all)
             
-            // Depth map overlay (PIP)
-            if let depthImage = depthData.depthOverlayImage {
+            // Picture-in-Picture depth overlay
+            if let depthImage = viewModel.sessionManager.depthOverlayImage {
                 Image(uiImage: depthImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -47,10 +25,10 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
             
-            // Depth value display
+            // Depth value display at the bottom
             VStack {
                 Spacer()
-                Text(String(format: "Distance: %.2f m", depthData.centerDepth))
+                Text(String(format: "Distance: %.2f m", viewModel.sessionManager.centerDepth))
                     .padding()
                     .background(Color.black.opacity(0.5))
                     .foregroundColor(.white)
@@ -58,21 +36,23 @@ struct ContentView: View {
                     .padding(.bottom, 20)
             }
             
-            // Safety overlay
-            if let overlayColor = overlayColor {
+            // Safety overlay when within warning or critical range
+            if let overlayColor = viewModel.overlayColor {
                 overlayColor
                     .edgesIgnoringSafeArea(.all)
                     .transition(.opacity)
             }
         }
         .overlay(
-            CrossMarker(color: alertColor)
+            // Crosshair marker showing current alert color
+            CrossMarker(color: viewModel.alertColor)
                 .frame(width: 40, height: 40),
             alignment: .center
         )
         .overlay(
-            Button(action: { soundEnabled.toggle() }) {
-                Image(systemName: soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+            // Button to toggle sound feedback
+            Button(action: { viewModel.soundEnabled.toggle() }) {
+                Image(systemName: viewModel.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                     .font(.system(size: 24))
                     .frame(width: 44, height: 44)
                     .padding()
@@ -83,23 +63,6 @@ struct ContentView: View {
             .padding(),
             alignment: .topLeading
         )
-        .onChange(of: depthData.centerDepth) { _, newDepth in
-            handleDepthChange(newDepth: newDepth)
-        }
-        .onDisappear {
-            feedbackManager.stopAll()
-        }
-    }
-    
-    private func handleDepthChange(newDepth: Float) {
-        switch newDepth {
-        case ..<criticalThreshold:
-            feedbackManager.handleCriticalState(soundEnabled: soundEnabled)
-        case ..<warningThreshold:
-            feedbackManager.handleWarningState(soundEnabled: soundEnabled)
-        default:
-            feedbackManager.stopAll()
-        }
     }
 }
 
