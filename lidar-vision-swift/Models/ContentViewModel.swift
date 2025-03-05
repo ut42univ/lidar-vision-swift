@@ -15,6 +15,7 @@ final class ContentViewModel: ObservableObject {
     @Published var sessionManager: ARSessionManager
     // Controls sound feedback on/off
     @Published var soundEnabled: Bool = false
+    @Published var capturedImage: UIImage? = nil
     
     private let feedbackManager: FeedbackManager
     private var cancellables = Set<AnyCancellable>()
@@ -53,6 +54,11 @@ final class ContentViewModel: ObservableObject {
         } else {
             feedbackManager.stopAll()
         }
+    }
+    
+    func capturePhoto() {
+        guard let image = sessionManager.capturePhoto() else { return }
+        capturedImage = image
     }
     
     // Computed property for the crosshair color based on depth

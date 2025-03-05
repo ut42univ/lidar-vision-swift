@@ -17,11 +17,13 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
     // Published properties for depth value and overlay image
     @Published var centerDepth: Float = 0.0
     @Published var depthOverlayImage: UIImage? = nil
+    weak var arView: ARView?
     
     private let ciContext = CIContext()
     
     // Starts the AR session with the required configuration
     func startSession(for arView: ARView) {
+        self.arView = arView
         let configuration = ARWorldTrackingConfiguration()
         if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
             configuration.frameSemantics.insert(.sceneDepth)
@@ -71,5 +73,26 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
             return nil
         }
         return UIImage(cgImage: cgImage)
+    }
+    
+    func capturePhoto() -> UIImage? {
+        guard let frame = arView?.session.currentFrame else { return nil }
+        let imageBuffer = frame.capturedImage
+        
+        let ciImage = CIImage(cvPixelBuffer: imageBuffer)
+        let context = CIContext()
+        guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return nil }
+        
+        let orientation: UIImage.Orientation = {
+            switch UIDevice.current.orientation {
+            case .portrait: return .right
+            case .landscapeLeft: return .up
+            case .landscapeRight: return .down
+            case .portraitUpsideDown: return .left
+            default: return .right
+            }
+        }()
+        
+        return UIImage(cgImage: cgImage, scale: 1.0, orientation: orientation)
     }
 }

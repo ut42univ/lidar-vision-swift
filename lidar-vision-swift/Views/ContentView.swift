@@ -43,6 +43,18 @@ struct ContentView: View {
                     .edgesIgnoringSafeArea(.all)
                     .transition(.opacity)
             }
+            
+            // Photo preview with manual close
+            if let photo = viewModel.capturedImage {
+                photoPreview(photo)
+                    .zIndex(1)
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.8)),
+                            removal: .opacity.combined(with: .scale(scale: 1.2))
+                        )
+                    )
+            }
         }
         .overlay(
             // Crosshair marker with dynamic alert color.
@@ -52,7 +64,9 @@ struct ContentView: View {
         )
         .overlay(
             // Button to toggle sound feedback.
-            Button(action: { viewModel.soundEnabled.toggle() }) {
+            Button(action: {
+                viewModel.soundEnabled.toggle()
+            }) {
                 Image(systemName: viewModel.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                     .font(.system(size: 24))
                     .frame(width: 44, height: 44)
@@ -64,6 +78,47 @@ struct ContentView: View {
             .padding(),
             alignment: .topLeading
         )
+        .overlay(
+            Button(action: {
+                withAnimation(.smooth) {
+                    viewModel.capturePhoto()
+                }
+            }) {
+                Image(systemName: "camera")
+                    .font(.system(size: 24))
+                    .frame(width: 44, height: 44)
+                    .padding()
+                    .background(Color.black.opacity(0.5))
+                    .foregroundColor(.white)
+                    .clipShape(Circle())
+            }
+            .padding(),
+            alignment: .bottomLeading
+        )
+    }
+    
+    private func photoPreview(_ image: UIImage) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: 300, maxHeight: 300)
+                .background(Color.black.opacity(0.8))
+                .cornerRadius(12)
+                .padding()
+                .shadow(radius: 10)
+            
+            Button(action: {
+                withAnimation(.smooth) {
+                    viewModel.capturedImage = nil
+                }
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 32))
+                    .foregroundColor(.white)
+                    .padding(8)
+            }
+        }
     }
 }
 
