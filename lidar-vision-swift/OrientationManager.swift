@@ -1,3 +1,11 @@
+//
+//  OrientationManager.swift
+//  lidar-vision-swift
+//
+//  Created by Takuya Uehara on 2025/03/05.
+//
+
+
 import SwiftUI
 import Combine
 

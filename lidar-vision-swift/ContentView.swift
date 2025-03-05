@@ -1,21 +1,22 @@
 import SwiftUI
 import AudioToolbox
 
-// Main content view that renders the AR experience and feedback UI
+// Main content view rendering AR and feedback UI.
 struct ContentView: View {
     @StateObject var viewModel = ContentViewModel()
-    
+    @StateObject var orientationManager = OrientationManager()
+
     var body: some View {
         ZStack {
             ARViewContainer(sessionManager: viewModel.sessionManager)
                 .edgesIgnoringSafeArea(.all)
             
-            // Picture-in-Picture depth overlay
+            // PIP depth overlay with dynamic rotation based on device orientation.
             if let depthImage = viewModel.sessionManager.depthOverlayImage {
                 Image(uiImage: depthImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .rotationEffect(Angle(degrees: 90))
+                    .rotationEffect(Angle(degrees: orientationManager.rotationAngle))
                     .frame(width: 150, height: 150)
                     .cornerRadius(4)
                     .padding(4)
@@ -25,7 +26,7 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
             
-            // Depth value display at the bottom
+            // Depth value display at the bottom.
             VStack {
                 Spacer()
                 Text(String(format: "Distance: %.2f m", viewModel.sessionManager.centerDepth))
@@ -36,7 +37,7 @@ struct ContentView: View {
                     .padding(.bottom, 20)
             }
             
-            // Safety overlay when within warning or critical range
+            // Safety overlay based on depth thresholds.
             if let overlayColor = viewModel.overlayColor {
                 overlayColor
                     .edgesIgnoringSafeArea(.all)
@@ -44,13 +45,13 @@ struct ContentView: View {
             }
         }
         .overlay(
-            // Crosshair marker showing current alert color
+            // Crosshair marker with dynamic alert color.
             CrossMarker(color: viewModel.alertColor)
                 .frame(width: 40, height: 40),
             alignment: .center
         )
         .overlay(
-            // Button to toggle sound feedback
+            // Button to toggle sound feedback.
             Button(action: { viewModel.soundEnabled.toggle() }) {
                 Image(systemName: viewModel.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                     .font(.system(size: 24))
