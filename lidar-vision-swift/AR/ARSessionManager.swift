@@ -1,27 +1,19 @@
-//
-//  ARSessionManager.swift
-//  lidar-vision-swift
-//
-//  Created by Takuya Uehara on 2025/03/05.
-//
-
-
 import Foundation
 import ARKit
 import RealityKit
 import CoreImage
 import UIKit
 
-// Manages AR session and depth data extraction
 final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
-    // Published properties for depth value and overlay image
     @Published var centerDepth: Float = 0.0
-    @Published var depthOverlayImage: UIImage? = nil
+    @Published var depthOverlayImage: UIImage?
     weak var arView: ARView?
     
     private let ciContext = CIContext()
+    // Configurable pseudo-color parameters for depth overlay
+    private let overlayColor0 = CIColor(red: 0, green: 0, blue: 1)
+    private let overlayColor1 = CIColor(red: 1, green: 0, blue: 0)
     
-    // Starts the AR session with the required configuration
     func startSession(for arView: ARView) {
         self.arView = arView
         let configuration = ARWorldTrackingConfiguration()
@@ -32,7 +24,6 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
         arView.session.run(configuration)
     }
     
-    // ARSessionDelegate method to process each ARFrame
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         guard let sceneDepth = frame.sceneDepth else { return }
         let depthMap = sceneDepth.depthMap
@@ -42,7 +33,6 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
         CVPixelBufferLockBaseAddress(depthMap, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
         
-        // Extract the center depth value
         if let baseAddress = CVPixelBufferGetBaseAddress(depthMap) {
             let floatBuffer = baseAddress.assumingMemoryBound(to: Float32.self)
             let centerIndex = (height / 2) * width + (width / 2)
@@ -52,7 +42,6 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
             }
         }
         
-        // Generate a pseudo-colored overlay image from the depth map
         if let overlayImage = generateOverlayImage(from: depthMap) {
             DispatchQueue.main.async {
                 self.depthOverlayImage = overlayImage
@@ -60,13 +49,12 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
         }
     }
     
-    // Converts a CVPixelBuffer depth map into a pseudo-colored UIImage
     private func generateOverlayImage(from pixelBuffer: CVPixelBuffer) -> UIImage? {
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         guard let falseColorFilter = CIFilter(name: "CIFalseColor") else { return nil }
         falseColorFilter.setValue(ciImage, forKey: kCIInputImageKey)
-        falseColorFilter.setValue(CIColor(red: 0, green: 0, blue: 1), forKey: "inputColor0")
-        falseColorFilter.setValue(CIColor(red: 1, green: 0, blue: 0), forKey: "inputColor1")
+        falseColorFilter.setValue(overlayColor0, forKey: "inputColor0")
+        falseColorFilter.setValue(overlayColor1, forKey: "inputColor1")
         
         guard let outputImage = falseColorFilter.outputImage,
               let cgImage = ciContext.createCGImage(outputImage, from: outputImage.extent) else {
@@ -78,21 +66,21 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
     func capturePhoto() -> UIImage? {
         guard let frame = arView?.session.currentFrame else { return nil }
         let imageBuffer = frame.capturedImage
-        
         let ciImage = CIImage(cvPixelBuffer: imageBuffer)
-        let context = CIContext()
-        guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return nil }
-        
-        let orientation: UIImage.Orientation = {
-            switch UIDevice.current.orientation {
-            case .portrait: return .right
-            case .landscapeLeft: return .up
-            case .landscapeRight: return .down
-            case .portraitUpsideDown: return .left
-            default: return .right
-            }
-        }()
-        
+        guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return nil }
+        let orientation = UIImage.Orientation(deviceOrientation: UIDevice.current.orientation)
         return UIImage(cgImage: cgImage, scale: 1.0, orientation: orientation)
+    }
+}
+
+extension UIImage.Orientation {
+    init(deviceOrientation: UIDeviceOrientation) {
+        switch deviceOrientation {
+        case .portrait: self = .right
+        case .landscapeLeft: self = .up
+        case .landscapeRight: self = .down
+        case .portraitUpsideDown: self = .left
+        default: self = .right
+        }
     }
 }

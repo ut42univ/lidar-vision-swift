@@ -1,17 +1,15 @@
 import SwiftUI
 import AudioToolbox
 
-// Main content view rendering AR and feedback UI.
 struct ContentView: View {
     @StateObject var viewModel = ContentViewModel()
     @StateObject var orientationManager = OrientationManager()
-
+    
     var body: some View {
         ZStack {
             ARViewContainer(sessionManager: viewModel.sessionManager)
-                .edgesIgnoringSafeArea(.all)
+                .ignoresSafeArea()
             
-            // PIP depth overlay with dynamic rotation based on device orientation.
             if let depthImage = viewModel.sessionManager.depthOverlayImage {
                 Image(uiImage: depthImage)
                     .resizable()
@@ -26,7 +24,6 @@ struct ContentView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
             
-            // Depth value display at the bottom.
             VStack {
                 Spacer()
                 Text(String(format: "Distance: %.2f m", viewModel.sessionManager.centerDepth))
@@ -37,33 +34,31 @@ struct ContentView: View {
                     .padding(.bottom, 20)
             }
             
-            // Safety overlay based on depth thresholds.
             if let overlayColor = viewModel.overlayColor {
                 overlayColor
-                    .edgesIgnoringSafeArea(.all)
+                    .ignoresSafeArea()
                     .transition(.opacity)
             }
             
-            // Photo preview with manual close
             if let photo = viewModel.capturedImage {
-                photoPreview(photo)
-                    .zIndex(1)
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 0.8)),
-                            removal: .opacity.combined(with: .scale(scale: 1.2))
-                        )
-                    )
+                PhotoPreview(image: photo) {
+                    withAnimation(.easeInOut) {
+                        viewModel.capturedImage = nil
+                    }
+                }
+                .zIndex(1)
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .scale(scale: 0.8)),
+                    removal: .opacity.combined(with: .scale(scale: 1.2))
+                ))
             }
         }
         .overlay(
-            // Crosshair marker with dynamic alert color.
             CrossMarker(color: viewModel.alertColor)
                 .frame(width: 40, height: 40),
             alignment: .center
         )
         .overlay(
-            // Button to toggle sound feedback.
             Button(action: {
                 viewModel.soundEnabled.toggle()
             }) {
@@ -80,7 +75,7 @@ struct ContentView: View {
         )
         .overlay(
             Button(action: {
-                withAnimation(.smooth) {
+                withAnimation(.easeInOut) {
                     viewModel.capturePhoto()
                 }
             }) {
@@ -96,8 +91,13 @@ struct ContentView: View {
             alignment: .bottomLeading
         )
     }
+}
+
+struct PhotoPreview: View {
+    let image: UIImage
+    let onClose: () -> Void
     
-    private func photoPreview(_ image: UIImage) -> some View {
+    var body: some View {
         ZStack(alignment: .topTrailing) {
             Image(uiImage: image)
                 .resizable()
@@ -108,11 +108,7 @@ struct ContentView: View {
                 .padding()
                 .shadow(radius: 10)
             
-            Button(action: {
-                withAnimation(.smooth) {
-                    viewModel.capturedImage = nil
-                }
-            }) {
+            Button(action: onClose) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 32))
                     .foregroundColor(.white)

@@ -2,7 +2,6 @@ import SwiftUI
 import ARKit
 import RealityKit
 
-// SwiftUI wrapper for ARView using the ARSessionManager
 struct ARViewContainer: UIViewRepresentable {
     @ObservedObject var sessionManager: ARSessionManager
     
