@@ -8,7 +8,7 @@
 import SwiftUI
 
 @main
-struct lidar_vision_swiftApp: App {
+struct LidarVisionApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
