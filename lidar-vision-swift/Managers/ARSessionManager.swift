@@ -25,29 +25,28 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
     }
     
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        guard let sceneDepth = frame.sceneDepth else { return }
-        let depthMap = sceneDepth.depthMap
-        let width = CVPixelBufferGetWidth(depthMap)
-        let height = CVPixelBufferGetHeight(depthMap)
-        
-        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
-        
-        if let baseAddress = CVPixelBufferGetBaseAddress(depthMap) {
-            let floatBuffer = baseAddress.assumingMemoryBound(to: Float32.self)
-            let centerIndex = (height / 2) * width + (width / 2)
-            let depthAtCenter = floatBuffer[centerIndex]
-            DispatchQueue.main.async {
-                self.centerDepth = depthAtCenter
-            }
-        }
-        
-        if let overlayImage = generateOverlayImage(from: depthMap) {
-            DispatchQueue.main.async {
-                self.depthOverlayImage = overlayImage
+        autoreleasepool {
+            guard let sceneDepth = frame.sceneDepth else { return }
+            let depthMap = sceneDepth.depthMap
+            
+            // Update center depth quickly.
+            let width = CVPixelBufferGetWidth(depthMap)
+            let height = CVPixelBufferGetHeight(depthMap)
+            
+            CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+            defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+            
+            if let baseAddress = CVPixelBufferGetBaseAddress(depthMap) {
+                let floatBuffer = baseAddress.assumingMemoryBound(to: Float32.self)
+                let centerIndex = (height / 2) * width + (width / 2)
+                let depthAtCenter = floatBuffer[centerIndex]
+                DispatchQueue.main.async {
+                    self.centerDepth = depthAtCenter
+                }
             }
         }
     }
+
     
     private func generateOverlayImage(from pixelBuffer: CVPixelBuffer) -> UIImage? {
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
