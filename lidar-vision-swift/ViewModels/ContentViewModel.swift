@@ -4,6 +4,8 @@ import Combine
 final class ContentViewModel: ObservableObject {
     @Published var sessionManager: ARSessionManager
     @Published var soundEnabled: Bool = false
+    @Published var spatialAudioEnabled: Bool = false
+    @Published var spatialAudioVolume: Float = 0.8 // Default spatial audio volume
     @Published var capturedImage: UIImage?
     @Published var showPhotoDetail = false
     
@@ -27,6 +29,21 @@ final class ContentViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] newDepth in
                 self?.handleDepthChange(newDepth: newDepth)
+            }
+            .store(in: &cancellables)
+        
+        // Observe spatial audio property changes
+        $spatialAudioEnabled
+            .dropFirst() // Skip initial value
+            .sink { [weak self] enabled in
+                self?.toggleSpatialAudio(enabled: enabled)
+            }
+            .store(in: &cancellables)
+        
+        $spatialAudioVolume
+            .dropFirst() // Skip initial value
+            .sink { [weak self] volume in
+                self?.updateSpatialAudioVolume(volume)
             }
             .store(in: &cancellables)
             
@@ -63,6 +80,21 @@ final class ContentViewModel: ObservableObject {
         sessionManager.toggleMeshVisibility()
     }
     
+    // Toggle spatial audio
+    func toggleSpatialAudio() {
+        spatialAudioEnabled.toggle()
+    }
+    
+    // Implementation of spatial audio toggle
+    private func toggleSpatialAudio(enabled: Bool) {
+        sessionManager.toggleSpatialAudio()
+    }
+    
+    // Update spatial audio volume
+    private func updateSpatialAudioVolume(_ volume: Float) {
+        sessionManager.setSpatialAudioVolume(volume)
+    }
+    
     // Manual mesh cache reset
     func resetMeshCache() {
         sessionManager.resetMeshCache()
@@ -72,19 +104,15 @@ final class ContentViewModel: ObservableObject {
         sessionManager.isMeshVisible
     }
     
+    var isSpatialAudioEnabled: Bool {
+        sessionManager.spatialAudioEnabled
+    }
+    
     var alertColor: Color {
-        switch sessionManager.centerDepth {
-        case ..<criticalDepthThreshold: return .red
-        case ..<warningDepthThreshold: return .yellow
-        default: return .white
-        }
+        return .white // 常に白色を返す
     }
     
     var overlayColor: Color? {
-        switch sessionManager.centerDepth {
-        case ..<criticalDepthThreshold: return Color.red.opacity(0.2)
-        case ..<warningDepthThreshold: return Color.yellow.opacity(0.2)
-        default: return nil
-        }
+        return nil // オーバーレイを表示しない
     }
 }

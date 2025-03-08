@@ -7,6 +7,7 @@ import UIKit
 final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
     @Published var centerDepth: Float = 0.0
     @Published var isMeshVisible: Bool = true
+    @Published var spatialAudioEnabled: Bool = false
     
     weak var arView: ARView?
     private let ciContext = CIContext()
@@ -19,6 +20,9 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
     private var lastCameraPosition: simd_float3?
     private let distanceThresholdForReset: Float = 50.0 // Reset after 50m movement
     private let maxMeshDistance: Float = 15.0 // Keep only meshes within 15m
+    
+    // Enhanced spatial audio manager
+    private let spatialAudioManager = SpatialAudioManager()
     
     func startSession(for arView: ARView) {
         self.arView = arView
@@ -40,7 +44,6 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
         }
         
         // Configure debug options to visualize the mesh
-        // This shows 3D mesh overlay using RealityKit's built-in visualization
         updateMeshVisibility()
         
         arView.session.delegate = self
@@ -48,6 +51,8 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
         
         // Start cache management
         setupCacheManagement()
+        
+        print("ARSessionManager: Session started with mesh reconstruction")
     }
     
     // Toggle 3D mesh visibility
@@ -63,6 +68,29 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
         } else {
             arView?.debugOptions.remove(.showSceneUnderstanding)
         }
+    }
+    
+    // Toggle spatial audio
+    func toggleSpatialAudio() {
+        spatialAudioEnabled.toggle()
+        
+        if spatialAudioEnabled {
+            spatialAudioManager.startSpatialAudio()
+            print("ARSessionManager: Spatial audio enabled")
+        } else {
+            spatialAudioManager.stopSpatialAudio()
+            print("ARSessionManager: Spatial audio disabled")
+        }
+    }
+    
+    // Set spatial audio volume
+    func setSpatialAudioVolume(_ volume: Float) {
+        spatialAudioManager.setVolumeMultiplier(volume)
+    }
+    
+    // Recheck for AirPods connection
+    func recheckAirPodsConnection() {
+        spatialAudioManager.recheckForAirPods()
     }
     
     // MARK: - Mesh Cache Management
@@ -170,6 +198,23 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
                 }
             }
             
+            // Update spatial audio with current mesh data if enabled
+            if spatialAudioEnabled {
+                spatialAudioManager.updateWithMeshData(
+                    meshAnchors: meshAnchors,
+                    cameraTransform: frame.camera.transform
+                )
+                
+                // Update audio listener orientation from device if not using AirPods tracking
+                if let orientation = UIDevice.current.orientation.deviceOrientation {
+                    spatialAudioManager.updateListenerOrientation(
+                        yaw: orientation.yaw,
+                        pitch: orientation.pitch,
+                        roll: orientation.roll
+                    )
+                }
+            }
+            
             // Mesh cache management: distance-based reset
             let currentPosition = simd_make_float3(
                 frame.camera.transform.columns.3.x,
@@ -193,7 +238,6 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
             }
             
             // Filter out-of-range meshes at a frequency of 1 every 10 frames
-            // Use frame timestamp instead of camera timestamp
             if Int(frame.timestamp * 100) % 10 == 0 {
                 filterMeshAnchors(maxDistance: maxMeshDistance)
             }
@@ -247,12 +291,11 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
         let imageBuffer = frame.capturedImage
         let ciImage = CIImage(cvPixelBuffer: imageBuffer)
         guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return nil }
-        let orientation = UIImage.Orientation(deviceOrientation: UIDevice.current.orientation)
+        let orientation = UIImage.Orientation(rawValue: UIDevice.current.orientation.rawValue) ?? .up
         return UIImage(cgImage: cgImage, scale: 1.0, orientation: orientation)
     }
     
     deinit {
-        // タイマーとオブザーバーの解放
         cacheResetTimer?.invalidate()
         cacheResetTimer = nil
         
@@ -260,14 +303,24 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
     }
 }
 
-extension UIImage.Orientation {
-    init(deviceOrientation: UIDeviceOrientation) {
-        switch deviceOrientation {
-        case .portrait: self = .right
-        case .landscapeLeft: self = .up
-        case .landscapeRight: self = .down
-        case .portraitUpsideDown: self = .left
-        default: self = .right
+// Extension to convert device orientation to spatial audio orientation values
+extension UIDeviceOrientation {
+    var deviceOrientation: (yaw: Float, pitch: Float, roll: Float)? {
+        switch self {
+        case .portrait:
+            return (yaw: 0, pitch: 0, roll: 0)
+        case .portraitUpsideDown:
+            return (yaw: 0, pitch: 0, roll: Float.pi)
+        case .landscapeLeft:
+            return (yaw: -Float.pi/2, pitch: 0, roll: 0)
+        case .landscapeRight:
+            return (yaw: Float.pi/2, pitch: 0, roll: 0)
+        case .faceUp:
+            return (yaw: 0, pitch: -Float.pi/2, roll: 0)
+        case .faceDown:
+            return (yaw: 0, pitch: Float.pi/2, roll: 0)
+        default:
+            return nil
         }
     }
 }
