@@ -10,19 +10,7 @@ struct ContentView: View {
             ARViewContainer(sessionManager: viewModel.sessionManager)
                 .ignoresSafeArea()
             
-            if let depthImage = viewModel.sessionManager.depthOverlayImage {
-                Image(uiImage: depthImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .rotationEffect(Angle(degrees: orientationManager.rotationAngle))
-                    .frame(width: 150, height: 150)
-                    .cornerRadius(4)
-                    .padding(4)
-                    .background(Color.black.opacity(0.7))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .padding()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            }
+            // Removed PIP depth overlay
             
             VStack {
                 Spacer()
@@ -46,34 +34,65 @@ struct ContentView: View {
             alignment: .center
         )
         .overlay(
-            Button(action: {
-                viewModel.soundEnabled.toggle()
-            }) {
-                Image(systemName: viewModel.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                    .font(.system(size: 24))
-                    .frame(width: 44, height: 44)
-                    .padding()
-                    .background(Color.black.opacity(0.5))
-                    .foregroundColor(.white)
-                    .clipShape(Circle())
+            HStack(spacing: 10) {
+                // Sound toggle button
+                Button(action: {
+                    viewModel.soundEnabled.toggle()
+                }) {
+                    Image(systemName: viewModel.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                        .font(.system(size: 20))
+                        .frame(width: 40, height: 40)
+                        .background(Color.black.opacity(0.5))
+                        .foregroundColor(.white)
+                        .clipShape(Circle())
+                }
+                
+                // Mesh visibility toggle button
+                Button(action: {
+                    viewModel.toggleMeshVisibility()
+                }) {
+                    Image(systemName: viewModel.isMeshVisible ? "grid.circle.fill" : "grid.circle")
+                        .font(.system(size: 20))
+                        .frame(width: 40, height: 40)
+                        .background(Color.black.opacity(0.5))
+                        .foregroundColor(.white)
+                        .clipShape(Circle())
+                }
+                
+                // Mesh reset button
+                Button(action: {
+                    viewModel.resetMeshCache()
+                }) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 20))
+                        .frame(width: 40, height: 40)
+                        .background(Color.black.opacity(0.5))
+                        .foregroundColor(.white)
+                        .clipShape(Circle())
+                }
             }
             .padding(),
             alignment: .topLeading
         )
         .overlay(
-            Button(action: {
-                viewModel.capturePhoto()
-            }) {
-                Image(systemName: "camera")
-                    .font(.system(size: 24))
-                    .frame(width: 44, height: 44)
-                    .padding()
-                    .background(Color.black.opacity(0.5))
-                    .foregroundColor(.white)
-                    .clipShape(Circle())
+            VStack {
+                Spacer()
+                HStack {
+                    Button(action: {
+                        viewModel.capturePhoto()
+                    }) {
+                        Image(systemName: "camera")
+                            .font(.system(size: 24))
+                            .frame(width: 44, height: 44)
+                            .padding()
+                            .background(Color.black.opacity(0.5))
+                            .foregroundColor(.white)
+                            .clipShape(Circle())
+                    }
+                    Spacer()
+                }
+                .padding()
             }
-            .padding(),
-            alignment: .bottomLeading
         )
         .fullScreenCover(isPresented: $viewModel.showPhotoDetail, content: {
             if let capturedImage = viewModel.capturedImage {

@@ -29,6 +29,16 @@ final class ContentViewModel: ObservableObject {
                 self?.handleDepthChange(newDepth: newDepth)
             }
             .store(in: &cancellables)
+            
+        // Reset mesh cache when app moves to background
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("App moved to background: Resetting mesh cache")
+            self?.sessionManager.resetMeshCache()
+        }
     }
     
     private func handleDepthChange(newDepth: Float) {
@@ -46,6 +56,20 @@ final class ContentViewModel: ObservableObject {
             capturedImage = image
             showPhotoDetail = true
         }
+    }
+    
+    // Toggle 3D mesh visibility
+    func toggleMeshVisibility() {
+        sessionManager.toggleMeshVisibility()
+    }
+    
+    // Manual mesh cache reset
+    func resetMeshCache() {
+        sessionManager.resetMeshCache()
+    }
+    
+    var isMeshVisible: Bool {
+        sessionManager.isMeshVisible
     }
     
     var alertColor: Color {
