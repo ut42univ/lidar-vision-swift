@@ -43,12 +43,14 @@ struct ContentView: View {
                 
                 // Spatial audio toggle button with AirPods icon
                 Button(action: {
+                    // 先に AirPods チェックを実行し、アラートを表示
                     if !viewModel.spatialAudioEnabled {
-                        // Check for AirPods when enabling
                         viewModel.sessionManager.recheckAirPodsConnection()
                         showAirPodsAlert = true
+                    } else {
+                        // 既に有効な場合は単純に無効化
+                        viewModel.toggleSpatialAudio()
                     }
-                    viewModel.toggleSpatialAudio()
                 }) {
                     Image(systemName: viewModel.spatialAudioEnabled ? "airpodsmax" : "headphones")
                         .font(.system(size: 20))
@@ -128,12 +130,13 @@ struct ContentView: View {
                 isEnabled: $viewModel.spatialAudioEnabled
             )
         }
-        .alert(isPresented: $showAirPodsAlert) {
-            Alert(
-                title: Text("3D空間オーディオ"),
-                message: Text("AirPodsまたはAirPods Proを装着すると、ヘッドトラッキングによる高度な空間オーディオが有効になります。ステレオイヤホンでも基本的な空間オーディオ機能は利用できます。"),
-                dismissButton: .default(Text("了解"))
-            )
+        .alert("3D空間オーディオ", isPresented: $showAirPodsAlert) {
+            Button("了解") {
+                // アラートを閉じた後に空間オーディオを有効化
+                viewModel.toggleSpatialAudio()
+            }
+        } message: {
+            Text("AirPodsまたはAirPods Proを装着すると、ヘッドトラッキングによる高度な空間オーディオが有効になります。ステレオイヤホンでも基本的な空間オーディオ機能は利用できます。")
         }
     }
 }

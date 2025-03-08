@@ -291,7 +291,25 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
         let imageBuffer = frame.capturedImage
         let ciImage = CIImage(cvPixelBuffer: imageBuffer)
         guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return nil }
-        let orientation = UIImage.Orientation(rawValue: UIDevice.current.orientation.rawValue) ?? .up
+        
+        // デバイスの向きを考慮して画像の向きを適切に調整
+        let orientation: UIImage.Orientation
+        
+        switch UIDevice.current.orientation {
+        case .portrait:
+            orientation = .right
+        case .portraitUpsideDown:
+            orientation = .left
+        case .landscapeLeft:
+            orientation = .down
+        case .landscapeRight:
+            orientation = .up
+        case .faceUp, .faceDown, .unknown:
+            orientation = .right // デフォルトはポートレート
+        @unknown default:
+            orientation = .right
+        }
+        
         return UIImage(cgImage: cgImage, scale: 1.0, orientation: orientation)
     }
     
