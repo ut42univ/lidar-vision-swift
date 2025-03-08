@@ -6,13 +6,31 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		96A25A442D7C1D2100BDD948 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 96A25A432D7C1D2100BDD948 /* Secrets.xcconfig */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		9691F9D52D71C97600F277BD /* lidar-vision-swift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "lidar-vision-swift.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		96A25A432D7C1D2100BDD948 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		96A25A462D7C1E8D00BDD948 /* Exceptions for "lidar-vision-swift" folder in "lidar-vision-swift" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 9691F9D42D71C97600F277BD /* lidar-vision-swift */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9691F9D72D71C97600F277BD /* lidar-vision-swift */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				96A25A462D7C1E8D00BDD948 /* Exceptions for "lidar-vision-swift" folder in "lidar-vision-swift" target */,
+			);
 			path = "lidar-vision-swift";
 			sourceTree = "<group>";
 		};
@@ -32,6 +50,7 @@
 		9691F9CC2D71C97600F277BD = {
 			isa = PBXGroup;
 			children = (
+				96A25A432D7C1D2100BDD948 /* Secrets.xcconfig */,
 				9691F9D72D71C97600F277BD /* lidar-vision-swift */,
 				9691F9D62D71C97600F277BD /* Products */,
 			);
@@ -109,6 +128,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				96A25A442D7C1D2100BDD948 /* Secrets.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,6 +147,7 @@
 /* Begin XCBuildConfiguration section */
 		9691F9E12D71C97700F277BD /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 96A25A432D7C1D2100BDD948 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -190,6 +211,7 @@
 		};
 		9691F9E22D71C97700F277BD /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 96A25A432D7C1D2100BDD948 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -255,6 +277,7 @@
 				DEVELOPMENT_TEAM = M3ULZV9WTP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "lidar-vision-swift/Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "このアプリはAR体験を提供するためにカメラを使用します。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -285,6 +308,7 @@
 				DEVELOPMENT_TEAM = M3ULZV9WTP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "lidar-vision-swift/Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "このアプリはAR体験を提供するためにカメラを使用します。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
