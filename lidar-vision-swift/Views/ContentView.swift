@@ -39,19 +39,6 @@ struct ContentView: View {
                     .ignoresSafeArea()
                     .transition(.opacity)
             }
-            
-            if let photo = viewModel.capturedImage {
-                PhotoPreview(image: photo) {
-                    withAnimation(.easeInOut) {
-                        viewModel.capturedImage = nil
-                    }
-                }
-                .zIndex(1)
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .scale(scale: 0.8)),
-                    removal: .opacity.combined(with: .scale(scale: 1.2))
-                ))
-            }
         }
         .overlay(
             CrossMarker(color: viewModel.alertColor)
@@ -75,9 +62,7 @@ struct ContentView: View {
         )
         .overlay(
             Button(action: {
-                withAnimation(.easeInOut) {
-                    viewModel.capturePhoto()
-                }
+                viewModel.capturePhoto()
             }) {
                 Image(systemName: "camera")
                     .font(.system(size: 24))
@@ -90,6 +75,11 @@ struct ContentView: View {
             .padding(),
             alignment: .bottomLeading
         )
+        .fullScreenCover(isPresented: $viewModel.showPhotoDetail, content: {
+            if let capturedImage = viewModel.capturedImage {
+                PhotoDetailView(image: capturedImage)
+            }
+        })
     }
 }
 

@@ -5,6 +5,7 @@ final class ContentViewModel: ObservableObject {
     @Published var sessionManager: ARSessionManager
     @Published var soundEnabled: Bool = false
     @Published var capturedImage: UIImage?
+    @Published var showPhotoDetail = false
     
     private let feedbackManager: FeedbackManager
     private var cancellables = Set<AnyCancellable>()
@@ -43,6 +44,7 @@ final class ContentViewModel: ObservableObject {
     func capturePhoto() {
         if let image = sessionManager.capturePhoto() {
             capturedImage = image
+            showPhotoDetail = true
         }
     }
     
