@@ -1,17 +1,10 @@
 import AudioToolbox
 import UIKit
 
-/// 触覚・音響フィードバックを管理するサービス
+/// 触覚フィードバックを管理するサービス（音響フィードバックは空間オーディオに統一）
 final class FeedbackService {
     private var hapticWarningTimer: Timer?
     private var hapticCriticalTimer: Timer?
-    private var warningSoundTimer: Timer?
-    private var criticalSoundTimer: Timer?
-    
-    private enum Sound {
-        static let warning: SystemSoundID = 1255
-        static let critical: SystemSoundID = 1256
-    }
     
     // MARK: - 触覚フィードバック
     
@@ -33,57 +26,21 @@ final class FeedbackService {
         hapticCriticalTimer = nil
     }
     
-    // MARK: - 音響フィードバック
-    
-    func startWarningSound() {
-        setupSoundTimer(&warningSoundTimer, interval: 1.0, soundID: Sound.warning)
-    }
-    
-    func startCriticalSound() {
-        setupSoundTimer(&criticalSoundTimer, interval: 0.5, soundID: Sound.critical)
-    }
-    
-    func stopWarningSound() {
-        warningSoundTimer?.invalidate()
-        warningSoundTimer = nil
-    }
-    
-    func stopCriticalSound() {
-        criticalSoundTimer?.invalidate()
-        criticalSoundTimer = nil
-    }
-    
     func stopAll() {
         stopWarningHapticFeedback()
         stopCriticalHapticFeedback()
-        stopWarningSound()
-        stopCriticalSound()
     }
     
     // MARK: - フィードバック状態ハンドラー
     
-    func handleWarningState(soundEnabled: Bool) {
+    func handleWarningState() {
         stopCriticalHapticFeedback()
         startWarningHapticFeedback()
-        stopCriticalSound()
-        
-        if soundEnabled {
-            startWarningSound()
-        } else {
-            stopWarningSound()
-        }
     }
     
-    func handleCriticalState(soundEnabled: Bool) {
+    func handleCriticalState() {
         stopWarningHapticFeedback()
         startCriticalHapticFeedback()
-        stopWarningSound()
-        
-        if soundEnabled {
-            startCriticalSound()
-        } else {
-            stopCriticalSound()
-        }
     }
     
     // MARK: - タイマー設定ヘルパー
@@ -93,14 +50,6 @@ final class FeedbackService {
         
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
             UIImpactFeedbackGenerator(style: style).impactOccurred()
-        }
-    }
-    
-    private func setupSoundTimer(_ timer: inout Timer?, interval: TimeInterval, soundID: SystemSoundID) {
-        guard timer == nil else { return }
-        
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
-            AudioServicesPlaySystemSound(soundID)
         }
     }
 }

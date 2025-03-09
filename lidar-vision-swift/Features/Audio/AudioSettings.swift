@@ -34,8 +34,6 @@ struct AudioSettings {
     struct SoundEffects {
         var isEnabled: Bool = true
         var hapticFeedback: Bool = true
-        var warningVolume: Float = 0.7
-        var criticalVolume: Float = 1.0
     }
     
     var spatialAudio = SpatialAudio()

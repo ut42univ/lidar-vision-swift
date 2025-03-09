@@ -32,12 +32,6 @@ struct ContentView: View {
         .overlay(
             // 上部コントロールボタン
             HStack(spacing: 10) {
-                // サウンド切り替えボタン
-                controlButton(
-                    icon: viewModel.soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill",
-                    action: { viewModel.soundEnabled.toggle() }
-                )
-                
                 // 空間オーディオ切り替えボタン
                 controlButton(
                     icon: viewModel.spatialAudioEnabled ? "airpodsmax" : "headphones",

@@ -4,7 +4,6 @@ import Combine
 /// メイン画面のViewModel
 final class ContentViewModel: ObservableObject {
     // 公開プロパティ
-    @Published var soundEnabled: Bool = false
     @Published var spatialAudioEnabled: Bool = false
     @Published var spatialAudioVolume: Float = 0.8
     @Published var capturedImage: UIImage?
@@ -70,9 +69,9 @@ final class ContentViewModel: ObservableObject {
     // 深度変更に対応
     private func handleDepthChange(newDepth: Float) {
         if newDepth < criticalDepthThreshold {
-            feedbackService.handleCriticalState(soundEnabled: soundEnabled)
+            feedbackService.handleCriticalState()
         } else if newDepth < warningDepthThreshold {
-            feedbackService.handleWarningState(soundEnabled: soundEnabled)
+            feedbackService.handleWarningState()
         } else {
             feedbackService.stopAll()
         }
