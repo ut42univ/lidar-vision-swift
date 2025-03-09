@@ -1,7 +1,8 @@
 import AudioToolbox
 import UIKit
 
-final class FeedbackManager: ObservableObject {
+/// 触覚・音響フィードバックを管理するサービス
+final class FeedbackService {
     private var hapticWarningTimer: Timer?
     private var hapticCriticalTimer: Timer?
     private var warningSoundTimer: Timer?
@@ -12,7 +13,7 @@ final class FeedbackManager: ObservableObject {
         static let critical: SystemSoundID = 1256
     }
     
-    // MARK: - Haptic Feedback
+    // MARK: - 触覚フィードバック
     
     func startWarningHapticFeedback() {
         setupTimer(&hapticWarningTimer, interval: 0.3, style: .medium)
@@ -32,7 +33,7 @@ final class FeedbackManager: ObservableObject {
         hapticCriticalTimer = nil
     }
     
-    // MARK: - Sound Feedback
+    // MARK: - 音響フィードバック
     
     func startWarningSound() {
         setupSoundTimer(&warningSoundTimer, interval: 1.0, soundID: Sound.warning)
@@ -59,12 +60,13 @@ final class FeedbackManager: ObservableObject {
         stopCriticalSound()
     }
     
-    // MARK: - Feedback Handling
+    // MARK: - フィードバック状態ハンドラー
     
     func handleWarningState(soundEnabled: Bool) {
         stopCriticalHapticFeedback()
         startWarningHapticFeedback()
         stopCriticalSound()
+        
         if soundEnabled {
             startWarningSound()
         } else {
@@ -76,6 +78,7 @@ final class FeedbackManager: ObservableObject {
         stopWarningHapticFeedback()
         startCriticalHapticFeedback()
         stopWarningSound()
+        
         if soundEnabled {
             startCriticalSound()
         } else {
@@ -83,10 +86,11 @@ final class FeedbackManager: ObservableObject {
         }
     }
     
-    // MARK: - Timer Setup
+    // MARK: - タイマー設定ヘルパー
     
     private func setupTimer(_ timer: inout Timer?, interval: TimeInterval, style: UIImpactFeedbackGenerator.FeedbackStyle) {
         guard timer == nil else { return }
+        
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
             UIImpactFeedbackGenerator(style: style).impactOccurred()
         }
@@ -94,6 +98,7 @@ final class FeedbackManager: ObservableObject {
     
     private func setupSoundTimer(_ timer: inout Timer?, interval: TimeInterval, soundID: SystemSoundID) {
         guard timer == nil else { return }
+        
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
             AudioServicesPlaySystemSound(soundID)
         }

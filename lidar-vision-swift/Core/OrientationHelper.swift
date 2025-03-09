@@ -1,7 +1,8 @@
 import SwiftUI
 import Combine
 
-final class OrientationManager: ObservableObject {
+/// デバイスの向きを管理するヘルパークラス
+final class OrientationHelper: ObservableObject {
     @Published var rotationAngle: Double = 90
     private var cancellable: AnyCancellable?
     

@@ -19,6 +19,7 @@
 		96A25A462D7C1E8D00BDD948 /* Exceptions for "lidar-vision-swift" folder in "lidar-vision-swift" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"Core/UIDeviceOrientation+Extensions.swift",
 				Info.plist,
 			);
 			target = 9691F9D42D71C97600F277BD /* lidar-vision-swift */;

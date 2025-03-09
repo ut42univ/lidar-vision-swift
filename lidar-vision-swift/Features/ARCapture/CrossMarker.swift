@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// 中央の十字マーカー
 struct CrossMarker: View {
     var color: Color = .white
     
