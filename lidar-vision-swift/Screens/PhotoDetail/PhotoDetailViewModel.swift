@@ -13,10 +13,11 @@ final class PhotoDetailViewModel: ObservableObject {
     // プロパティを監視して状態変化をビューに通知
     @Published private(set) var isAnalyzing: Bool = false
     @Published private(set) var analysisError: String? = nil
+    @Published var autoPlay: Bool = true // 自動分析・読み上げの設定
     
     private var cancellables = Set<AnyCancellable>()
     
-    init(image: UIImage) {
+    init(image: UIImage, autoAnalyze: Bool = true) {
         print("Initializing PhotoDetailViewModel")
         self.image = image
         
@@ -26,6 +27,13 @@ final class PhotoDetailViewModel: ObservableObject {
         
         // サービスの状態変化を監視してプロパティに反映
         setupBindings()
+        
+        // 画面表示時に自動分析
+        if autoAnalyze {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.analyzeImage()
+            }
+        }
     }
     
     private func setupBindings() {
@@ -36,6 +44,22 @@ final class PhotoDetailViewModel: ObservableObject {
         
         openAIService.$error
             .assign(to: \.analysisError, on: self)
+            .store(in: &cancellables)
+        
+        // 分析完了時の処理
+        openAIService.$imageDescription
+            .dropFirst() // 初期値をスキップ
+            .filter { !$0.isEmpty } // 空でない場合のみ
+            .sink { [weak self] description in
+                guard let self = self else { return }
+                
+                // 自動読み上げが有効なら読み上げ開始
+                if self.autoPlay {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.speechService.speakWithAutoLanguageDetection(text: description)
+                    }
+                }
+            }
             .store(in: &cancellables)
     }
     
@@ -51,6 +75,16 @@ final class PhotoDetailViewModel: ObservableObject {
             speechService.stopSpeaking()
         } else if !openAIService.imageDescription.isEmpty {
             speechService.speakWithAutoLanguageDetection(text: openAIService.imageDescription)
+        }
+    }
+    
+    /// 自動読み上げを切り替え
+    func toggleAutoPlay() {
+        autoPlay.toggle()
+        if autoPlay && !openAIService.imageDescription.isEmpty && !speechService.isPlaying {
+            speakDescription()
+        } else if !autoPlay && speechService.isPlaying {
+            speechService.stopSpeaking()
         }
     }
     

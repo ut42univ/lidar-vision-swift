@@ -4,7 +4,6 @@ import SwiftUI
 struct ContentView: View {
     @StateObject var viewModel = ContentViewModel()
     @StateObject var orientationHelper = OrientationHelper()
-    @State private var showAudioSettings = false
     @State private var showAirPodsAlert = false
     
     var body: some View {
@@ -32,24 +31,24 @@ struct ContentView: View {
         .overlay(
             // 上部コントロールボタン
             HStack(spacing: 10) {
+                // 設定ボタン
+                controlButton(
+                    icon: "gear",
+                    action: { viewModel.showSettings = true }
+                )
+                
                 // 空間オーディオ切り替えボタン
                 controlButton(
-                    icon: viewModel.spatialAudioEnabled ? "airpodsmax" : "headphones",
-                    iconColor: viewModel.spatialAudioEnabled ? .green : .white,
+                    icon: viewModel.isSpatialAudioEnabled ? "airpodsmax" : "headphones",
+                    iconColor: viewModel.isSpatialAudioEnabled ? .green : .white,
                     action: {
-                        if !viewModel.spatialAudioEnabled {
+                        if !viewModel.isSpatialAudioEnabled {
                             viewModel.sessionService.recheckAirPodsConnection()
                             showAirPodsAlert = true
                         } else {
                             viewModel.toggleSpatialAudio()
                         }
                     }
-                )
-                
-                // オーディオ設定ボタン
-                controlButton(
-                    icon: "slider.horizontal.3",
-                    action: { showAudioSettings.toggle() }
                 )
                 
                 // メッシュ可視性切り替えボタン
@@ -68,21 +67,12 @@ struct ContentView: View {
             alignment: .topLeading
         )
         .overlay(
-            // カメラボタン
+            // カメラボタン（長押し対応）
             VStack {
                 Spacer()
                 HStack {
-                    Button(action: {
-                        viewModel.capturePhoto()
-                    }) {
-                        Image(systemName: "camera")
-                            .font(.system(size: 24))
-                            .frame(width: 44, height: 44)
-                            .padding()
-                            .background(Color.black.opacity(0.5))
-                            .foregroundColor(.white)
-                            .clipShape(Circle())
-                    }
+                    // 長押しジェスチャーを追加
+                    cameraButton
                     Spacer()
                 }
                 .padding()
@@ -93,10 +83,12 @@ struct ContentView: View {
                 PhotoDetailView(image: capturedImage)
             }
         }
-        .sheet(isPresented: $showAudioSettings) {
-            AudioSettingsView(
-                volume: $viewModel.spatialAudioVolume,
-                isEnabled: $viewModel.spatialAudioEnabled
+        .sheet(isPresented: $viewModel.showSettings) {
+            AppSettingsView(
+                settings: viewModel.appSettings,
+                onSettingsChanged: { newSettings in
+                    viewModel.updateSettings(newSettings)
+                }
             )
         }
         .alert("3D空間オーディオ", isPresented: $showAirPodsAlert) {
@@ -106,6 +98,31 @@ struct ContentView: View {
         } message: {
             Text("AirPodsまたはAirPods Proを装着すると、ヘッドトラッキングによる高度な空間オーディオが有効になります。ステレオイヤホンでも基本的な空間オーディオ機能は利用できます。")
         }
+    }
+    
+    // カメラボタン（長押し対応）
+    private var cameraButton: some View {
+        Image(systemName: "camera")
+            .font(.system(size: 24))
+            .frame(width: 60, height: 60)
+            .padding()
+            .background(Color.black.opacity(0.5))
+            .foregroundColor(.white)
+            .clipShape(Circle())
+            .gesture(
+                LongPressGesture(minimumDuration: 0.5)
+                    .onEnded { _ in
+                        // 触覚フィードバック
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        // 写真撮影と自動分析
+                        viewModel.captureAndAnalyzePhoto()
+                    }
+            )
+            .overlay(
+                Circle()
+                    .stroke(Color.white, lineWidth: 2)
+                    .padding(4)
+            )
     }
     
     // コントロールボタンを生成する補助関数

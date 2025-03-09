@@ -24,16 +24,10 @@ final class SpatialAudioService {
     private var cameraPosition: simd_float3 = simd_float3(0, 0, 0)
     
     // 設定
-    private let maxDistance: Float = 5.0 // 最大距離 (メートル)
-    private let nearThreshold: Float = 0.5 // 近距離閾値
-    private let mediumThreshold: Float = 2.0 // 中距離閾値
+    private var settings: AppSettings
     
-    // 音の特性
-    private let nearFrequency: Float = 880.0  // 高音
-    private let mediumFrequency: Float = 440.0 // 中音
-    private let farFrequency: Float = 220.0   // 低音
-    
-    init() {
+    init(settings: AppSettings = AppSettings()) {
+        self.settings = settings
         engine = AVAudioEngine()
         player = AVAudioPlayerNode()
         environmentNode = AVAudioEnvironmentNode()
@@ -76,9 +70,9 @@ final class SpatialAudioService {
     
     private func generateToneBuffers() {
         // 各距離範囲用のトーンを生成
-        nearBuffer = generateToneBuffer(frequency: nearFrequency, duration: 0.3)
-        mediumBuffer = generateToneBuffer(frequency: mediumFrequency, duration: 0.5)
-        farBuffer = generateToneBuffer(frequency: farFrequency, duration: 1.0)
+        nearBuffer = generateToneBuffer(frequency: settings.audioTones.highFrequency, duration: 0.3)
+        mediumBuffer = generateToneBuffer(frequency: settings.audioTones.mediumFrequency, duration: 0.5)
+        farBuffer = generateToneBuffer(frequency: settings.audioTones.lowFrequency, duration: 1.0)
         
         // デフォルトバッファを設定
         currentBuffer = farBuffer
@@ -122,6 +116,23 @@ final class SpatialAudioService {
     }
     
     // MARK: - 公開メソッド
+    
+    /// 設定を更新
+    func updateSettings(_ newSettings: AppSettings) {
+        self.settings = newSettings
+        
+        // 音量更新
+        volumeMultiplier = settings.spatialAudio.volume
+        
+        // トーンバッファを再生成
+        generateToneBuffers()
+        
+        // プレイヤーの更新
+        if isPlaying {
+            stopSpatialAudio()
+            startSpatialAudio()
+        }
+    }
     
     /// 空間オーディオフィードバックを開始
     func startSpatialAudio() {
@@ -209,7 +220,7 @@ final class SpatialAudioService {
         let distanceToAnchor = simd_distance(cameraPosition, anchorPosition)
         
         // 距離が最大距離を超える場合はスキップ
-        if distanceToAnchor > maxDistance {
+        if distanceToAnchor > settings.spatialAudio.maxDistance {
             return
         }
         
@@ -254,14 +265,14 @@ final class SpatialAudioService {
         positionSound(at: direction, distance: distance)
         
         // 距離に基づいて適切な音を選択
-        if distance < nearThreshold {
+        if distance < settings.spatialAudio.nearThreshold {
             // 近い障害物 - 高周波数、高音量
             if currentBuffer !== nearBuffer, let buffer = nearBuffer {
                 changeBuffer(to: buffer)
             }
             player.rate = 1.5
             
-        } else if distance < mediumThreshold {
+        } else if distance < settings.spatialAudio.mediumThreshold {
             // 中間距離 - 中周波数
             if currentBuffer !== mediumBuffer, let buffer = mediumBuffer {
                 changeBuffer(to: buffer)
@@ -289,7 +300,7 @@ final class SpatialAudioService {
         )
         
         // 距離に基づいて音量を計算 (近いほど大きい)
-        let volume = (1.0 - (distance / maxDistance)) * volumeMultiplier
+        let volume = (1.0 - (distance / settings.spatialAudio.maxDistance)) * volumeMultiplier
         
         // 最小音量を設定
         player.volume = max(0.1, min(1.0, volume))

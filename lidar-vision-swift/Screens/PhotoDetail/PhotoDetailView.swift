@@ -6,9 +6,9 @@ struct PhotoDetailView: View {
     @StateObject private var viewModel: PhotoDetailViewModel
     @Environment(\.dismiss) private var dismiss
     
-    init(image: UIImage) {
+    init(image: UIImage, autoAnalyze: Bool = true) {
         self.image = image
-        _viewModel = StateObject(wrappedValue: PhotoDetailViewModel(image: image))
+        _viewModel = StateObject(wrappedValue: PhotoDetailViewModel(image: image, autoAnalyze: autoAnalyze))
     }
     
     var body: some View {
@@ -33,6 +33,15 @@ struct PhotoDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     closeButton
+                }
+                
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Toggle(isOn: $viewModel.autoPlay) {
+                        Label("自動読み上げ", systemImage: "speaker.wave.2")
+                            .labelStyle(.iconOnly)
+                    }
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                    .disabled(viewModel.openAIService.imageDescription.isEmpty)
                 }
                 
                 if shouldShowAnalyzeButton {
