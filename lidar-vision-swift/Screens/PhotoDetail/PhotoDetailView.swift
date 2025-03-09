@@ -5,6 +5,7 @@ struct PhotoDetailView: View {
     let image: UIImage
     @StateObject private var viewModel: PhotoDetailViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var showChatView = false
     
     init(image: UIImage, autoAnalyze: Bool = true) {
         self.image = image
@@ -13,40 +14,67 @@ struct PhotoDetailView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // 画像表示部分
-                    imageView
-                    
-                    // ステータス表示部分
-                    statusContent
-                    
-                    // 読み上げ設定セクション
-                    if !viewModel.openAIService.imageDescription.isEmpty && viewModel.speechService.isPlaying {
-                        speechSettingsView
+            VStack {
+                if showChatView {
+                    // チャットビュー
+                    ChatView(
+                        openAIService: viewModel.openAIService,
+                        speechService: viewModel.speechService
+                    )
+                } else {
+                    // 通常の詳細ビュー
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            // 画像表示部分
+                            imageView
+                            
+                            // ステータス表示部分
+                            statusContent
+                            
+                            // 質問ボタン
+                            if !viewModel.openAIService.imageDescription.isEmpty {
+                                askQuestionButton
+                            }
+                        }
+                        .padding(.vertical)
                     }
                 }
-                .padding(.vertical)
             }
-            .navigationTitle("Photo Details")
+            .navigationTitle(showChatView ? "AIに質問" : "Photo Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     closeButton
                 }
                 
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Toggle(isOn: $viewModel.autoPlay) {
-                        Label("自動読み上げ", systemImage: "speaker.wave.2")
-                            .labelStyle(.iconOnly)
+                if !showChatView {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Toggle(isOn: $viewModel.autoPlay) {
+                            Label("自動読み上げ", systemImage: "speaker.wave.2")
+                                .labelStyle(.iconOnly)
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: .blue))
+                        .disabled(viewModel.openAIService.imageDescription.isEmpty)
                     }
-                    .toggleStyle(SwitchToggleStyle(tint: .blue))
-                    .disabled(viewModel.openAIService.imageDescription.isEmpty)
-                }
-                
-                if shouldShowAnalyzeButton {
-                    ToolbarItem(placement: .bottomBar) {
-                        analyzeButton
+                    
+                    if shouldShowAnalyzeButton {
+                        ToolbarItem(placement: .bottomBar) {
+                            analyzeButton
+                        }
+                    }
+                } else {
+                    // チャットビュー時の戻るボタン
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button(action: {
+                            withAnimation {
+                                showChatView = false
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "chevron.left")
+                                Text("戻る")
+                            }
+                        }
                     }
                 }
             }
@@ -55,6 +83,28 @@ struct PhotoDetailView: View {
             if viewModel.speechService.isPlaying {
                 viewModel.speechService.stopSpeaking()
             }
+            // 画面を閉じる時にコンテキストをリセット
+            viewModel.openAIService.resetConversation()
+        }
+    }
+    
+    // 質問ボタン
+    private var askQuestionButton: some View {
+        Button(action: {
+            withAnimation {
+                showChatView = true
+            }
+        }) {
+            HStack {
+                Image(systemName: "bubble.left.and.bubble.right.fill")
+                Text("AIに詳しく質問する")
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color.blue)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+            .padding(.horizontal)
         }
     }
     
@@ -88,13 +138,13 @@ struct PhotoDetailView: View {
         }
     }
     
-    // 読み上げ設定ビュー
-    private var speechSettingsView: some View {
-        SpeechSettingsView(
-            speechService: viewModel.speechService,
-            description: viewModel.openAIService.imageDescription
-        )
-    }
+    // 読み上げ設定ビュー（削除）
+    // private var speechSettingsView: some View {
+    //    SpeechSettingsView(
+    //        speechService: viewModel.speechService,
+    //        description: viewModel.openAIService.imageDescription
+    //    )
+    // }
     
     // 閉じるボタン
     private var closeButton: some View {

@@ -2,18 +2,21 @@ import AVFoundation
 import Combine
 import Foundation
 
-/// テキスト読み上げサービス
-final class TextToSpeechService: ObservableObject {
+/// シンプル化されたテキスト読み上げサービス（英語のみ）
+final class TextToSpeechService: NSObject, ObservableObject, @unchecked Sendable {
     private let synthesizer = AVSpeechSynthesizer()
     
     @Published var isPlaying: Bool = false
-    @Published var rate: Float = 0.5 // 読み上げ速度 (0.0 - 1.0)
-    @Published var pitch: Float = 1.0 // 音の高さ (0.5 - 2.0)
-    @Published var volume: Float = 0.8 // 音量 (0.0 - 1.0)
-    @Published var language: String = "en-US"
+    @Published var currentText: String = "" // 現在読み上げ中のテキスト
     
-    init() {
-        synthesizer.delegate = nil
+    // 固定設定
+    private let rate: Float = 0.5 // 読み上げ速度
+    private let pitch: Float = 1.0 // 音の高さ
+    private let volume: Float = 0.8 // 音量
+    
+    override init() {
+        super.init()
+        synthesizer.delegate = self
     }
     
     /// テキストを読み上げる
@@ -28,7 +31,10 @@ final class TextToSpeechService: ObservableObject {
         utterance.rate = rate
         utterance.pitchMultiplier = pitch
         utterance.volume = volume
-        utterance.voice = AVSpeechSynthesisVoice(language: language)
+        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        
+        // 現在のテキストを保存
+        currentText = text
         
         // 読み上げ開始
         synthesizer.speak(utterance)
@@ -41,30 +47,22 @@ final class TextToSpeechService: ObservableObject {
         isPlaying = false
     }
     
-    /// 言語を変更
-    func setLanguage(to languageCode: String) {
-        language = languageCode
-    }
-    
-    /// 自動言語検出して読み上げ
-    func speakWithAutoLanguageDetection(text: String) {
-        // テキストが英語っぽいかどうか簡易判定
-        let englishPattern = "^[A-Za-z0-9\\s.,!?;:'\"()-]+$"
-        if let regex = try? NSRegularExpression(pattern: englishPattern) {
-            let range = NSRange(location: 0, length: text.utf16.count)
-            if regex.firstMatch(in: text, options: [], range: range) != nil {
-                // 英語のテキストっぽい場合
-                language = "en-US"
-            } else {
-                // それ以外は日本語と仮定
-                language = "ja-JP"
-            }
-        }
-        
-        speak(text: text)
-    }
-    
     deinit {
         stopSpeaking()
+    }
+}
+
+// MARK: - AVSpeechSynthesizerDelegate
+extension TextToSpeechService: AVSpeechSynthesizerDelegate {
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        DispatchQueue.main.async {
+            self.isPlaying = false
+        }
+    }
+    
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        DispatchQueue.main.async {
+            self.isPlaying = false
+        }
     }
 }

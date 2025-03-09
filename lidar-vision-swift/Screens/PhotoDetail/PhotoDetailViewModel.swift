@@ -56,7 +56,7 @@ final class PhotoDetailViewModel: ObservableObject {
                 // 自動読み上げが有効なら読み上げ開始
                 if self.autoPlay {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        self.speechService.speakWithAutoLanguageDetection(text: description)
+                        self.speechService.speak(text: description)
                     }
                 }
             }
@@ -74,7 +74,7 @@ final class PhotoDetailViewModel: ObservableObject {
         if speechService.isPlaying {
             speechService.stopSpeaking()
         } else if !openAIService.imageDescription.isEmpty {
-            speechService.speakWithAutoLanguageDetection(text: openAIService.imageDescription)
+            speechService.speak(text: openAIService.imageDescription)
         }
     }
     
