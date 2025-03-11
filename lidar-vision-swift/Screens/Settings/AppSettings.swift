@@ -36,6 +36,10 @@ struct AppSettings: Codable {
     
     struct HapticFeedback: Codable {
         var isEnabled: Bool = true
+        // 振動を開始する距離 (メートル)
+        var startDistance: Float = 3.0
+        
+        // 内部で使用する強度値 (UI露出なし)
         var nearIntensity: HapticIntensity = .heavy
         var mediumIntensity: HapticIntensity = .medium
         var nearInterval: TimeInterval = 0.1  // 近距離の振動間隔（秒）

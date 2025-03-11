@@ -134,27 +134,26 @@ struct AppSettingsView: View {
                             onSettingsChanged(settings)
                         }
                     
-                    Picker("Near distance intensity", selection: $settings.hapticFeedback.nearIntensity) {
-                        Text("Light").tag(HapticIntensity.light)
-                        Text("Medium").tag(HapticIntensity.medium)
-                        Text("Heavy").tag(HapticIntensity.heavy)
+                    // 振動を開始する距離の設定
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Text("Start Vibration at:")
+                            Spacer()
+                            Text("\(String(format: "%.1f", settings.hapticFeedback.startDistance))m")
+                        }
+                        Slider(value: $settings.hapticFeedback.startDistance, in: 0.5...5.0, step: 0.1)
+                            .tint(.blue)
+                            .disabled(!settings.hapticFeedback.isEnabled)
+                            .onChange(of: settings.hapticFeedback.startDistance) {
+                                onSettingsChanged(settings)
+                            }
                     }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .disabled(!settings.hapticFeedback.isEnabled)
-                    .onChange(of: settings.hapticFeedback.nearIntensity) {
-                        onSettingsChanged(settings)
-                    }
+                    .padding(.vertical, 4)
                     
-                    Picker("Medium distance intensity", selection: $settings.hapticFeedback.mediumIntensity) {
-                        Text("Light").tag(HapticIntensity.light)
-                        Text("Medium").tag(HapticIntensity.medium)
-                        Text("Heavy").tag(HapticIntensity.heavy)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .disabled(!settings.hapticFeedback.isEnabled)
-                    .onChange(of: settings.hapticFeedback.mediumIntensity) {
-                        onSettingsChanged(settings)
-                    }
+                    // 説明文を追加
+                    Text("Haptic feedback intensity will increase naturally as you get closer to obstacles, based on human perception principles.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
                 // Reset settings button

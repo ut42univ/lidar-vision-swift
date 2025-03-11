@@ -94,8 +94,8 @@ final class FeedbackService {
     
     // 連続フィードバックの再開（必要な場合）
     private func restartContinuousFeedbackIfNeeded() {
-        // 連続フィードバックが有効だった場合は再開
-        if currentDepth < settings.spatialAudio.mediumThreshold {
+        // フィードバック開始距離を超えたら再開
+        if currentDepth < settings.hapticFeedback.startDistance {
             updateContinuousFeedback(for: currentDepth)
         }
     }
@@ -158,12 +158,48 @@ final class FeedbackService {
     
     // レガシーフィードバックの更新
     private func updateLegacyFeedback(for depth: Float) {
-        if depth < settings.spatialAudio.nearThreshold {
-            handleCriticalState()
-        } else if depth < settings.spatialAudio.mediumThreshold {
-            handleWarningState()
-        } else {
+        // フィードバック開始距離より遠い場合はフィードバックなし
+        if depth >= settings.hapticFeedback.startDistance {
             stopAll()
+            return
+        }
+        
+        // 距離に応じて指数関数的にフィードバック間隔を短くする
+        let normalizedDepth = depth / settings.hapticFeedback.startDistance
+        let progress = 1.0 - normalizedDepth // 1.0に近いほど近距離
+        
+        // 冪乗則（べき乗則）を適用 - スティーブンスの法則に基づく変化
+        // 冪指数0.5は平方根と同等で、人間の知覚に自然な変化を生み出す
+        let naturalProgress = pow(progress, 0.5)
+        
+        if naturalProgress > 0.7 { // 非常に近い
+            stopWarningHapticFeedback()
+            
+            // 間隔を距離に応じて動的に調整
+            let adjustedInterval = max(0.05, settings.hapticFeedback.nearInterval * (1 - Double(naturalProgress)))
+            setupTimer(
+                &hapticCriticalTimer,
+                interval: adjustedInterval,
+                style: settings.hapticFeedback.nearIntensity.uiStyle
+            )
+        } else if naturalProgress > 0.3 { // 中距離
+            stopCriticalHapticFeedback()
+            
+            // 間隔を距離に応じて動的に調整
+            let adjustedInterval = max(0.2, settings.hapticFeedback.mediumInterval * (1 - Double(naturalProgress)))
+            setupTimer(
+                &hapticWarningTimer,
+                interval: adjustedInterval,
+                style: settings.hapticFeedback.mediumIntensity.uiStyle
+            )
+        } else {
+            // 遠い距離の場合は間欠的なフィードバック
+            stopCriticalHapticFeedback()
+            setupTimer(
+                &hapticWarningTimer,
+                interval: settings.hapticFeedback.mediumInterval * 2,
+                style: .light
+            )
         }
     }
     
@@ -218,40 +254,37 @@ final class FeedbackService {
             return
         }
         
-        // 連続フィードバックが不要な距離の場合は停止
-        if depth >= settings.spatialAudio.mediumThreshold {
+        // フィードバック開始距離を超えたら停止
+        if depth >= settings.hapticFeedback.startDistance {
             stopContinuousFeedback()
             return
         }
         
         do {
-            // 距離に応じてパラメータを調整
-            let normalizedDistance: Float
-            let sharpness: Float
+            // 正規化された距離 (0.0 - 1.0)
+            let normalizedDepth = depth / settings.hapticFeedback.startDistance
+            let progress = 1.0 - normalizedDepth // 1.0に近いほど近距離
             
-            if depth < settings.spatialAudio.nearThreshold {
-                // 近距離: 強い振動と高いシャープネス
-                normalizedDistance = 1.0 - (depth / settings.spatialAudio.nearThreshold)
-                sharpness = 0.8 + (normalizedDistance * 0.2) // 0.8-1.0
-            } else {
-                // 中距離: 中程度の振動と中程度のシャープネス
-                normalizedDistance = 1.0 - ((depth - settings.spatialAudio.nearThreshold) /
-                                         (settings.spatialAudio.mediumThreshold - settings.spatialAudio.nearThreshold))
-                sharpness = 0.5 + (normalizedDistance * 0.3) // 0.5-0.8
-            }
+            // 冪乗則（べき乗則）を適用 - 人間の知覚に沿った自然な変化を実現
+            // スティーブンスの冪法則に基づき、0.5程度の指数を使用
+            // これにより線形よりも緩やかで、指数関数ほど急激でない、より自然な感覚変化が得られる
+            let naturalProgress = pow(progress, 0.5)
             
-            // 強度は距離から計算（近いほど強い）
-            let intensity = min(1.0, max(0.3, normalizedDistance))
+            // シャープネスも距離によって調整（より自然な変化）
+            let sharpness = 0.2 + (naturalProgress * 0.8) // 0.2-1.0の範囲
+            
+            // 強度を計算 (高い値ほど強い振動、0.0-1.0の範囲に制限)
+            let intensity = min(1.0, max(0.1, naturalProgress))
             
             // 連続フィードバックが既に実行中の場合はパラメータを更新、そうでなければ新規作成
             if let player = continuousPlayer {
                 try player.sendParameters([
                     CHHapticDynamicParameter(parameterID: .hapticIntensityControl, value: Float(intensity), relativeTime: 0),
                     CHHapticDynamicParameter(parameterID: .hapticSharpnessControl, value: Float(sharpness), relativeTime: 0)
-                ], atTime: CHHapticTimeImmediate) // atTimeパラメータを追加
+                ], atTime: CHHapticTimeImmediate)
             } else {
                 // 新しいパターンを作成して再生開始
-                try startContinuousFeedback(intensity: intensity, sharpness: sharpness) // tryを追加
+                try startContinuousFeedback(intensity: intensity, sharpness: sharpness)
             }
             
         } catch {
@@ -262,7 +295,7 @@ final class FeedbackService {
             
             do {
                 // 一定の初期値で再開を試みる
-                try startContinuousFeedback(intensity: 0.5, sharpness: 0.5) // tryを追加
+                try startContinuousFeedback(intensity: 0.5, sharpness: 0.5)
             } catch {
                 print("Failed to restart haptic feedback: \(error)")
             }
