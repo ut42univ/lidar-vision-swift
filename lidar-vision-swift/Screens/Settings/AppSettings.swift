@@ -34,13 +34,19 @@ struct AppSettings: Codable {
         var lowFrequency: Float = 220.0   // 低音（遠距離用）
     }
     
-    // 触覚フィードバック設定
     struct HapticFeedback: Codable {
         var isEnabled: Bool = true
         var nearIntensity: HapticIntensity = .heavy
         var mediumIntensity: HapticIntensity = .medium
         var nearInterval: TimeInterval = 0.1  // 近距離の振動間隔（秒）
         var mediumInterval: TimeInterval = 0.3 // 中距離の振動間隔（秒）
+        
+        // 追加: パフォーマンス最適化設定
+        var useCoreHaptics: Bool = true // CoreHapticsが使用可能な場合に使用するか
+        var powerSavingMode: Bool = false // バッテリー節約モード（振動を減らす）
+        
+        // 追加: アクセシビリティ調整
+        var intensityMultiplier: Float = 1.0 // 全体的な強度調整（0.5-1.5）
     }
     
     // テキスト読み上げ設定

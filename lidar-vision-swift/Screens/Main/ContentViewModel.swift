@@ -88,6 +88,15 @@ final class ContentViewModel: ObservableObject {
             // アプリがフォアグラウンドに戻る時
             self?.resumeARSession()
         }
+        
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // ハプティックフィードバックを停止（バッテリー消費削減）
+            self?.feedbackService.stopAll()
+        }
 
     }
     
@@ -108,15 +117,7 @@ final class ContentViewModel: ObservableObject {
     
     // 深度変更に対応
     private func handleDepthChange(newDepth: Float) {
-        if newDepth < criticalDepthThreshold {
-            feedbackService.handleCriticalState()
-        } else if newDepth < warningDepthThreshold {
-            feedbackService.handleWarningState()
-        } else {
-            feedbackService.stopAll()
-        }
-    }
-    
+        feedbackService.updateFeedbackForDepth(newDepth)}
     // 写真を撮影
     func capturePhoto() {
         // 撮影前にARSessionが動作していることを確認
