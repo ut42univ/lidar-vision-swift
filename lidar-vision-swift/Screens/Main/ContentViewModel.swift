@@ -69,6 +69,41 @@ final class ContentViewModel: ObservableObject {
         ) { [weak self] _ in
             self?.sessionService.resetMeshCache()
         }
+        
+        // AppDelegate や SceneDelegate が使用できない場合は、NotificationCenter で監視
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // アプリがバックグラウンドに移動する時
+            self?.pauseARSession()
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // アプリがフォアグラウンドに戻る時
+            self?.resumeARSession()
+        }
+
+    }
+    
+    /// ARセッションを一時停止
+    /// ARセッションを一時停止
+    func pauseARSession() {
+        // 触覚フィードバックを停止
+        feedbackService.stopAll()
+        
+        // ARセッションを一時停止（空間オーディオの停止も含む）
+        sessionService.pauseSession()
+    }
+
+    /// ARセッションを再開
+    func resumeARSession() {
+        sessionService.resumeSession()
     }
     
     // 深度変更に対応
@@ -84,14 +119,48 @@ final class ContentViewModel: ObservableObject {
     
     // 写真を撮影
     func capturePhoto() {
+        // 撮影前にARSessionが動作していることを確認
+        if !sessionService.isSessionRunning {
+            sessionService.resumeSession()
+            
+            // セッションの再開に少し時間を与える
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                if let image = self?.sessionService.capturePhoto() {
+                    self?.capturedImage = image
+                    self?.showPhotoDetail = true
+                }
+            }
+            return
+        }
+        
+        // 通常通り撮影
         if let image = sessionService.capturePhoto() {
             capturedImage = image
             showPhotoDetail = true
         }
     }
+
     
     // 写真を撮影して自動分析
     func captureAndAnalyzePhoto() {
+        // 撮影前にARSessionが動作していることを確認
+        if !sessionService.isSessionRunning {
+            sessionService.resumeSession()
+            
+            // セッションの再開に少し時間を与える
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                if let image = self?.sessionService.capturePhoto() {
+                    self?.capturedImage = image
+                    self?.showPhotoDetail = true
+                    
+                    // 撮影成功フィードバック（振動）
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
+            }
+            return
+        }
+        
+        // 通常通り撮影
         if let image = sessionService.capturePhoto() {
             capturedImage = image
             showPhotoDetail = true
@@ -100,7 +169,6 @@ final class ContentViewModel: ObservableObject {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
     }
-    
     // 3Dメッシュの可視性を切り替え
     func toggleMeshVisibility() {
         sessionService.toggleMeshVisibility()
@@ -150,5 +218,9 @@ final class ContentViewModel: ObservableObject {
     // 設定を保存
     private func saveSettings() {
         appSettings.save()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }

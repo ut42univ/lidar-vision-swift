@@ -78,18 +78,32 @@ struct ContentView: View {
                 .padding()
             }
         )
-        .fullScreenCover(isPresented: $viewModel.showPhotoDetail) {
+        .fullScreenCover(isPresented: $viewModel.showPhotoDetail, onDismiss: {
+            // 詳細画面を閉じたらARセッションを再開
+            viewModel.resumeARSession()
+        }) {
             if let capturedImage = viewModel.capturedImage {
                 PhotoDetailView(image: capturedImage)
+                    .onAppear {
+                        // 詳細画面を開いたらARセッションを一時停止
+                        viewModel.pauseARSession()
+                    }
             }
         }
-        .sheet(isPresented: $viewModel.showSettings) {
+        .sheet(isPresented: $viewModel.showSettings, onDismiss: {
+            // 設定画面を閉じたらARセッションを再開
+            viewModel.resumeARSession()
+        }) {
             AppSettingsView(
                 settings: viewModel.appSettings,
                 onSettingsChanged: { newSettings in
                     viewModel.updateSettings(newSettings)
                 }
             )
+            .onAppear {
+                // 設定画面を開いたらARセッションを一時停止
+                viewModel.pauseARSession()
+            }
         }
         .alert("3D Spatial Audio", isPresented: $showAirPodsAlert) {
             Button("OK") {

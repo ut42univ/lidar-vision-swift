@@ -10,6 +10,7 @@ final class ARSessionService: NSObject, ObservableObject {
     @Published var centerDepth: Float = 0.0
     @Published var isMeshVisible: Bool = true
     @Published var spatialAudioEnabled: Bool = false
+    @Published var isSessionRunning: Bool = false
     
     // 依存サービス
     private let meshService: MeshManagementService
@@ -197,6 +198,53 @@ extension ARSessionService: ARSessionDelegate {
             if let meshAnchor = anchor as? ARMeshAnchor {
                 meshService.removeMeshAnchor(meshAnchor)
             }
+        }
+    }
+    
+    /// ARセッションを一時停止
+    func pauseSession() {
+        print("Pausing AR session")
+        
+        // 空間オーディオが有効な場合は停止
+        if spatialAudioEnabled {
+            toggleSpatialAudio() // 既存のトグルメソッドを使用して無効化
+        }
+        
+        arView?.session.pause()
+    }
+    /// ARセッションを再開
+    func resumeSession() {
+        guard let arView = arView else {
+            print("Cannot resume session: arView is nil")
+            return
+        }
+        
+        print("Resuming AR session")
+        if let configuration = arView.session.configuration {
+            // 既存の設定を使って再開
+            arView.session.run(configuration)
+            isSessionRunning = true  // セッション再開時にフラグを更新
+        } else {
+            // 新しい設定で開始（万が一のため）
+            let configuration = ARWorldTrackingConfiguration()
+            
+            if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
+                configuration.frameSemantics.insert(.sceneDepth)
+            }
+            
+            if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+                configuration.sceneReconstruction = .mesh
+                configuration.environmentTexturing = .automatic
+            }
+            
+            arView.session.run(configuration)
+            isSessionRunning = true  // セッション再開時にフラグを更新
+        }
+        
+        // セッション再開後、空間オーディオの状態を復元
+        // spatialAudioEnabledは設定上の値、this.spatialAudioEnabledは現在の実行状態
+        if spatialAudioEnabled && !self.spatialAudioEnabled {
+            toggleSpatialAudio() // 有効化
         }
     }
 }
