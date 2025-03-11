@@ -34,7 +34,11 @@ struct ContentView: View {
                 // 設定ボタン
                 controlButton(
                     icon: "gear",
-                    action: { viewModel.showSettings = true }
+                    action: {
+                        // 設定画面を表示する前に必ずARセッションを一時停止
+                        viewModel.pauseARSession()
+                        viewModel.showSettings = true
+                    }
                 )
                 
                 // 空間オーディオ切り替えボタン
@@ -86,13 +90,17 @@ struct ContentView: View {
                 PhotoDetailView(image: capturedImage)
                     .onAppear {
                         // 詳細画面を開いたらARセッションを一時停止
-                        viewModel.pauseARSession()
+                        // この行は冗長に見えますが、確実性のために残します
+                        print("PhotoDetailView appeared")
                     }
             }
         }
         .sheet(isPresented: $viewModel.showSettings, onDismiss: {
             // 設定画面を閉じたらARセッションを再開
-            viewModel.resumeARSession()
+            print("Settings dismissed")
+            DispatchQueue.main.async {
+                viewModel.resumeARSession()
+            }
         }) {
             AppSettingsView(
                 settings: viewModel.appSettings,
@@ -102,7 +110,8 @@ struct ContentView: View {
             )
             .onAppear {
                 // 設定画面を開いたらARセッションを一時停止
-                viewModel.pauseARSession()
+                // この行は冗長に見えますが、確実性のために残します
+                print("AppSettingsView appeared")
             }
         }
         .alert("3D Spatial Audio", isPresented: $showAirPodsAlert) {
@@ -111,6 +120,14 @@ struct ContentView: View {
             }
         } message: {
             Text("Advanced spatial audio with head tracking is available when using AirPods or AirPods Pro. Basic spatial audio is available with any stereo headphones.")
+        }
+        .onAppear {
+            // 画面が表示されたときにセッションが確実に実行されるようにする
+            viewModel.resumeARSession()
+        }
+        .onDisappear {
+            // 画面が非表示になったときにセッションを一時停止する
+            viewModel.pauseARSession()
         }
     }
     
@@ -128,6 +145,10 @@ struct ContentView: View {
                     .onEnded { _ in
                         // 触覚フィードバック
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        
+                        // ARセッションを一時停止してから写真を撮影
+                        viewModel.pauseARSession()
+                        
                         // 写真撮影と自動分析
                         viewModel.captureAndAnalyzePhoto()
                     }

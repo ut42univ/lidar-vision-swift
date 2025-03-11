@@ -20,15 +20,9 @@ final class ContentViewModel: ObservableObject {
     // 内部状態
     private var cancellables = Set<AnyCancellable>()
     
-    // 深度閾値（メートル単位）
-    private var warningDepthThreshold: Float {
-        return appSettings.spatialAudio.mediumThreshold
-    }
-    private var criticalDepthThreshold: Float {
-        return appSettings.spatialAudio.nearThreshold
-    }
-    
     init() {
+        print("ContentViewModel initializing")
+        
         // 設定をロード
         let loadedSettings = AppSettings.load()
         
@@ -89,22 +83,16 @@ final class ContentViewModel: ObservableObject {
             self?.resumeARSession()
         }
         
-        NotificationCenter.default.addObserver(
-            forName: UIApplication.willResignActiveNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            // ハプティックフィードバックを停止（バッテリー消費削減）
-            self?.feedbackService.stopAll()
-        }
-
+        // フィードバックサービスをアクティブ化
+        feedbackService.activateFeedback()
     }
     
     /// ARセッションを一時停止
-    /// ARセッションを一時停止
     func pauseARSession() {
-        // 触覚フィードバックを停止
-        feedbackService.stopAll()
+        print("ContentViewModel: pauseARSession called")
+        
+        // フィードバックサービスを非アクティブ化
+        feedbackService.deactivateFeedback()
         
         // ARセッションを一時停止（空間オーディオの停止も含む）
         sessionService.pauseSession()
@@ -112,12 +100,20 @@ final class ContentViewModel: ObservableObject {
 
     /// ARセッションを再開
     func resumeARSession() {
+        print("ContentViewModel: resumeARSession called")
+        
+        // フィードバックサービスを再アクティブ化
+        feedbackService.activateFeedback()
+        
+        // ARセッションを再開
         sessionService.resumeSession()
     }
     
     // 深度変更に対応
     private func handleDepthChange(newDepth: Float) {
-        feedbackService.updateFeedbackForDepth(newDepth)}
+        feedbackService.updateFeedbackForDepth(newDepth)
+    }
+    
     // 写真を撮影
     func capturePhoto() {
         // 撮影前にARSessionが動作していることを確認
@@ -144,6 +140,9 @@ final class ContentViewModel: ObservableObject {
     
     // 写真を撮影して自動分析
     func captureAndAnalyzePhoto() {
+        // 撮影前にフィードバックを一時停止
+        feedbackService.stopAll()
+        
         // 撮影前にARSessionが動作していることを確認
         if !sessionService.isSessionRunning {
             sessionService.resumeSession()
@@ -170,6 +169,7 @@ final class ContentViewModel: ObservableObject {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
     }
+    
     // 3Dメッシュの可視性を切り替え
     func toggleMeshVisibility() {
         sessionService.toggleMeshVisibility()
@@ -222,6 +222,8 @@ final class ContentViewModel: ObservableObject {
     }
     
     deinit {
+        print("ContentViewModel deinitializing")
         NotificationCenter.default.removeObserver(self)
+        feedbackService.deactivateFeedback()
     }
 }

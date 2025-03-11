@@ -2,10 +2,8 @@ import AudioToolbox
 import UIKit
 import CoreHaptics
 
-/// 触覚フィードバックを管理するサービス
+/// 触覚フィードバックを管理するサービス - CoreHapticsのみを使用
 final class FeedbackService {
-    private var hapticWarningTimer: Timer?
-    private var hapticCriticalTimer: Timer?
     private var settings: AppSettings
     
     // CoreHaptics関連
@@ -16,6 +14,9 @@ final class FeedbackService {
     private var sharpnessParameter: CHHapticDynamicParameter?
     private var currentDepth: Float = 10.0 // 初期値は十分に遠い
     
+    // 状態管理用
+    private var isActive = false
+    
     init(settings: AppSettings = AppSettings()) {
         self.settings = settings
         
@@ -25,7 +26,11 @@ final class FeedbackService {
         // CoreHapticsをサポートしている場合はエンジンを初期化
         if supportsHaptics {
             setupHapticEngine()
+        } else {
+            print("Device does not support CoreHaptics - no haptic feedback will be available")
         }
+        
+        print("FeedbackService initialized")
     }
     
     // MARK: - デバイス機能チェック
@@ -39,20 +44,23 @@ final class FeedbackService {
     // MARK: - CoreHapticsエンジンのセットアップ
     
     private func setupHapticEngine() {
-        guard supportsHaptics else { return }
+        guard supportsHaptics, engine == nil else { return }
         
         do {
             engine = try CHHapticEngine()
             try engine?.start()
             
+            print("Haptic engine started successfully")
+            
             // エンジンの停止時に自動的に再起動するように設定
             engine?.stoppedHandler = { [weak self] reason in
                 print("Haptic engine stopped with reason: \(reason.rawValue)")
-                guard let self = self else { return }
+                guard let self = self, self.isActive else { return }
                 
                 // エンジンを再起動
                 do {
                     try self.engine?.start()
+                    print("Haptic engine restarted")
                 } catch {
                     print("Failed to restart haptic engine: \(error)")
                 }
@@ -61,10 +69,11 @@ final class FeedbackService {
             // アプリがバックグラウンドになった時にエンジンを一時停止
             engine?.resetHandler = { [weak self] in
                 print("Haptic engine reset")
-                guard let self = self else { return }
+                guard let self = self, self.isActive else { return }
                 
                 do {
                     try self.engine?.start()
+                    print("Haptic engine started after reset")
                     
                     // 連続フィードバックを再開（必要な場合）
                     self.restartContinuousFeedbackIfNeeded()
@@ -95,124 +104,68 @@ final class FeedbackService {
     // 連続フィードバックの再開（必要な場合）
     private func restartContinuousFeedbackIfNeeded() {
         // フィードバック開始距離を超えたら再開
-        if currentDepth < settings.hapticFeedback.startDistance {
+        if isActive && currentDepth < settings.hapticFeedback.startDistance {
             updateContinuousFeedback(for: currentDepth)
         }
     }
     
     // MARK: - パブリックインターフェース
     
+    /// フィードバックの有効化 - 設定画面から戻るときに呼び出す
+    func activateFeedback() {
+        print("Activating feedback service")
+        isActive = true
+        
+        // CoreHapticsが使用できない場合は処理を行わない
+        guard supportsHaptics else { return }
+        
+        // エンジンが停止している場合は再開
+        if engine == nil {
+            setupHapticEngine()
+        } else {
+            do {
+                try engine?.start()
+                print("Restarted haptic engine on activation")
+            } catch {
+                print("Failed to restart haptic engine: \(error)")
+            }
+        }
+        
+        // 最新の深度情報に基づいてフィードバックを更新
+        if currentDepth < settings.hapticFeedback.startDistance {
+            updateContinuousFeedback(for: currentDepth)
+        }
+    }
+    
+    /// フィードバックの無効化 - 設定画面に移行する前に呼び出す
+    func deactivateFeedback() {
+        print("Deactivating feedback service")
+        isActive = false
+        stopAll()
+        
+        // CoreHapticsエンジンを停止
+        if let engine = self.engine {
+            engine.stop()
+            continuousPlayer = nil
+            print("Stopped haptic engine on deactivation")
+        }
+    }
+    
     /// 深度に基づいてハプティックフィードバックを更新
     func updateFeedbackForDepth(_ depth: Float) {
-        guard settings.hapticFeedback.isEnabled else { return }
+        guard isActive && settings.hapticFeedback.isEnabled && supportsHaptics else { return }
         
         // 現在の深度を保存
         currentDepth = depth
         
-        // コアハプティックをサポートしている場合は連続フィードバックを更新
-        if supportsHaptics {
-            updateContinuousFeedback(for: depth)
-        } else {
-            // 従来のタイマーベースフィードバック
-            updateLegacyFeedback(for: depth)
-        }
+        // CoreHapticsによるフィードバック更新
+        updateContinuousFeedback(for: depth)
     }
     
-    // MARK: - 従来のシンプルな触覚フィードバック（レガシーサポート）
-    
-    func startWarningHapticFeedback() {
-        guard settings.hapticFeedback.isEnabled else { return }
-        setupTimer(
-            &hapticWarningTimer,
-            interval: settings.hapticFeedback.mediumInterval,
-            style: settings.hapticFeedback.mediumIntensity.uiStyle
-        )
-    }
-    
-    func startCriticalHapticFeedback() {
-        guard settings.hapticFeedback.isEnabled else { return }
-        setupTimer(
-            &hapticCriticalTimer,
-            interval: settings.hapticFeedback.nearInterval,
-            style: settings.hapticFeedback.nearIntensity.uiStyle
-        )
-    }
-    
-    func stopWarningHapticFeedback() {
-        hapticWarningTimer?.invalidate()
-        hapticWarningTimer = nil
-    }
-    
-    func stopCriticalHapticFeedback() {
-        hapticCriticalTimer?.invalidate()
-        hapticCriticalTimer = nil
-    }
-    
+    /// すべてのフィードバックを停止
     func stopAll() {
-        stopWarningHapticFeedback()
-        stopCriticalHapticFeedback()
-        
-        // CoreHapticsのフィードバックも停止
+        print("Stopping all haptic feedback")
         stopContinuousFeedback()
-    }
-    
-    // レガシーフィードバックの更新
-    private func updateLegacyFeedback(for depth: Float) {
-        // フィードバック開始距離より遠い場合はフィードバックなし
-        if depth >= settings.hapticFeedback.startDistance {
-            stopAll()
-            return
-        }
-        
-        // 距離に応じて指数関数的にフィードバック間隔を短くする
-        let normalizedDepth = depth / settings.hapticFeedback.startDistance
-        let progress = 1.0 - normalizedDepth // 1.0に近いほど近距離
-        
-        // 冪乗則（べき乗則）を適用 - スティーブンスの法則に基づく変化
-        // 冪指数0.5は平方根と同等で、人間の知覚に自然な変化を生み出す
-        let naturalProgress = pow(progress, 0.5)
-        
-        if naturalProgress > 0.7 { // 非常に近い
-            stopWarningHapticFeedback()
-            
-            // 間隔を距離に応じて動的に調整
-            let adjustedInterval = max(0.05, settings.hapticFeedback.nearInterval * (1 - Double(naturalProgress)))
-            setupTimer(
-                &hapticCriticalTimer,
-                interval: adjustedInterval,
-                style: settings.hapticFeedback.nearIntensity.uiStyle
-            )
-        } else if naturalProgress > 0.3 { // 中距離
-            stopCriticalHapticFeedback()
-            
-            // 間隔を距離に応じて動的に調整
-            let adjustedInterval = max(0.2, settings.hapticFeedback.mediumInterval * (1 - Double(naturalProgress)))
-            setupTimer(
-                &hapticWarningTimer,
-                interval: adjustedInterval,
-                style: settings.hapticFeedback.mediumIntensity.uiStyle
-            )
-        } else {
-            // 遠い距離の場合は間欠的なフィードバック
-            stopCriticalHapticFeedback()
-            setupTimer(
-                &hapticWarningTimer,
-                interval: settings.hapticFeedback.mediumInterval * 2,
-                style: .light
-            )
-        }
-    }
-    
-    // MARK: - フィードバック状態ハンドラー
-    
-    func handleWarningState() {
-        stopCriticalHapticFeedback()
-        startWarningHapticFeedback()
-    }
-    
-    func handleCriticalState() {
-        stopWarningHapticFeedback()
-        startCriticalHapticFeedback()
     }
     
     /// 設定を更新
@@ -225,30 +178,21 @@ final class FeedbackService {
         if wasEnabled != settings.hapticFeedback.isEnabled {
             if !settings.hapticFeedback.isEnabled {
                 stopAll()
-            } else {
+            } else if isActive && supportsHaptics {
                 // 現在の深度に基づいてフィードバックを更新
                 updateFeedbackForDepth(currentDepth)
             }
-        } else if settings.hapticFeedback.isEnabled {
+        } else if settings.hapticFeedback.isEnabled && isActive && supportsHaptics {
             // 設定が変更された場合はフィードバックを更新
             updateFeedbackForDepth(currentDepth)
         }
     }
     
-    // MARK: - タイマー設定ヘルパー
-    
-    private func setupTimer(_ timer: inout Timer?, interval: TimeInterval, style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        guard timer == nil else { return }
-        
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
-            UIImpactFeedbackGenerator(style: style).impactOccurred()
-        }
-    }
-    
-    // MARK: - コアハプティックスによる高度なフィードバック
+    // MARK: - コアハプティックスによるフィードバック
     
     private func updateContinuousFeedback(for depth: Float) {
         guard supportsHaptics,
+              isActive,
               settings.hapticFeedback.isEnabled,
               let _ = engine else {
             return
@@ -293,6 +237,14 @@ final class FeedbackService {
             // エラーが発生した場合は連続フィードバックを止めて再作成を試みる
             stopContinuousFeedback()
             
+            // エンジンが正常に機能していない可能性があるため、再起動を試みる
+            print("Attempting to restart the haptic engine")
+            do {
+                try engine?.start()
+            } catch {
+                print("Failed to restart engine: \(error)")
+            }
+            
             do {
                 // 一定の初期値で再開を試みる
                 try startContinuousFeedback(intensity: 0.5, sharpness: 0.5)
@@ -304,10 +256,12 @@ final class FeedbackService {
 
     
     private func startContinuousFeedback(intensity: Float, sharpness: Float) throws {
-        guard supportsHaptics, let engine = engine else { return }
+        guard supportsHaptics, let engine = engine, isActive else { return }
         
         // 既存のプレイヤーを停止
         stopContinuousFeedback()
+        
+        print("Starting continuous feedback with intensity: \(intensity), sharpness: \(sharpness)")
         
         // 連続的な触覚パターンの作成
         let continuousEvent = CHHapticEvent(
@@ -338,6 +292,7 @@ final class FeedbackService {
         
         do {
             try player.stop(atTime: CHHapticTimeImmediate)
+            print("Stopped continuous haptic feedback")
         } catch {
             print("Failed to stop continuous haptic feedback: \(error)")
         }
@@ -345,6 +300,7 @@ final class FeedbackService {
     }
 
     deinit {
+        print("FeedbackService deinitializing")
         stopAll()
         
         // CoreHapticsエンジンを停止
