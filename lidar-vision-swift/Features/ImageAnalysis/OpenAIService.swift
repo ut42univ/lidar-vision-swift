@@ -39,13 +39,13 @@ final class OpenAIService: ObservableObject {
         
         // APIキーチェック
         if apiKey.isEmpty {
-            self.error = "有効なAPIキーがありません。Info.plistの設定を確認してください。"
+            self.error = "No valid API key. Please check your Info.plist settings."
             print("Invalid API key")
             return
         }
         
         guard let imageData = image.jpegData(compressionQuality: 0.7) else {
-            self.error = "画像の変換に失敗しました"
+            self.error = "Failed to convert image"
             print("Failed to convert image to JPEG data")
             return
         }
@@ -59,7 +59,7 @@ final class OpenAIService: ObservableObject {
         if imageSizeKB > 20000 { // 20MB制限の仮定
             print("Image too large, trying with lower quality")
             guard let compressedData = image.jpegData(compressionQuality: 0.5) else {
-                self.error = "大きな画像の圧縮に失敗しました"
+                self.error = "Failed to compress large image"
                 return
             }
             
@@ -179,7 +179,7 @@ final class OpenAIService: ObservableObject {
                         // 会話履歴に追加
                         self.messages.append(ChatMessage(content: content, isUser: false))
                     } else {
-                        self.error = "応答の解析に失敗しました"
+                        self.error = "Failed to parse response"
                         print("Failed to parse response: no content found")
                     }
                 }
@@ -193,7 +193,7 @@ final class OpenAIService: ObservableObject {
         
         // APIキーチェック
         if apiKey.isEmpty {
-            self.error = "有効なAPIキーがありません。Info.plistの設定を確認してください。"
+            self.error = "API key is required."
             print("Invalid API key")
             return
         }
@@ -313,7 +313,7 @@ final class OpenAIService: ObservableObject {
                         // 会話履歴に追加
                         self.messages.append(ChatMessage(content: content, isUser: false))
                     } else {
-                        self.error = "応答の解析に失敗しました"
+                        self.error = "Failed to parse response: no content found"
                         print("Failed to parse response: no content found")
                     }
                 }

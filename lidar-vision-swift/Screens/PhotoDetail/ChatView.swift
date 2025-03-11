@@ -51,7 +51,7 @@ struct ChatView: View {
             VStack(spacing: 8) {
                 // テキスト入力フィールド
                 HStack(spacing: 8) {
-                    TextField("AIに質問する...", text: $questionText)
+                    TextField("Ask AI a qustion...", text: $questionText)
                         .padding(10)
                         .background(Color(.systemGray6))
                         .cornerRadius(20)
@@ -91,7 +91,7 @@ struct ChatView: View {
                 
                 // 音声入力中のガイダンス
                 if isRecording {
-                    Text("音声を認識中... (タップで停止)")
+                    Text("Recognizing voice... (Tap to stop)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .padding(.vertical, 4)
@@ -105,7 +105,7 @@ struct ChatView: View {
                 HStack {
                     ProgressView()
                         .scaleEffect(0.7)
-                    Text("思考中...")
+                    Text("Thinking...")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -179,7 +179,7 @@ struct MessageBubble: View {
             
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 2) {
                 HStack {
-                    Text(message.isUser ? "あなた" : "AI")
+                    Text(message.isUser ? "You" : "AI")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     

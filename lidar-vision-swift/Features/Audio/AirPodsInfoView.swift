@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// AirPodsの拡張機能に関する情報を表示するビュー
+/// Information view for AirPods extended features
 struct AirPodsInfoView: View {
     @Environment(\.dismiss) private var dismiss
     
@@ -12,45 +12,45 @@ struct AirPodsInfoView: View {
                     .foregroundColor(.blue)
                     .padding(.top, 40)
                 
-                Text("AirPods Proでの拡張機能")
+                Text("Extended Features with AirPods Pro")
                     .font(.title2)
                     .fontWeight(.bold)
                 
                 VStack(alignment: .leading, spacing: 16) {
                     FeatureRow(
                         icon: "person.wave.2.fill",
-                        title: "ヘッドトラッキング",
-                        description: "頭の動きを検出し、それに合わせて音源の位置を調整します。"
+                        title: "Head Tracking",
+                        description: "Detects the movement of your head and adjusts the position of sound sources accordingly."
                     )
                     
                     FeatureRow(
                         icon: "ear.and.waveform",
-                        title: "ダイナミックヘッドトラッキング",
-                        description: "AirPods Proが頭の動きを検出し、音の方向を現実世界に固定します。"
+                        title: "Dynamic Head Tracking",
+                        description: "AirPods Pro detect your head movements and fix sound directions to the real world."
                     )
                     
                     FeatureRow(
                         icon: "speaker.wave.3.fill",
-                        title: "没入型オーディオ",
-                        description: "周囲の障害物からの音が、より正確な方向から聞こえるようになります。"
+                        title: "Immersive Audio",
+                        description: "Sound from surrounding obstacles can be heard from more accurate directions."
                     )
                 }
                 .padding(.horizontal, 30)
                 
                 Spacer()
                 
-                Text("AirPods ProまたはAirPods Maxを接続すると、これらの機能が自動的に有効になります。")
+                Text("These features are automatically enabled when you connect AirPods Pro or AirPods Max.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
                     .padding(.bottom, 20)
             }
-            .navigationTitle("AirPods 拡張機能")
+            .navigationTitle("AirPods Features")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("閉じる") {
+                    Button("Close") {
                         dismiss()
                     }
                 }
@@ -59,7 +59,7 @@ struct AirPodsInfoView: View {
     }
 }
 
-/// 機能説明の行コンポーネント
+/// Feature row component
 struct FeatureRow: View {
     var icon: String
     var title: String
@@ -84,4 +84,3 @@ struct FeatureRow: View {
         }
     }
 }
-

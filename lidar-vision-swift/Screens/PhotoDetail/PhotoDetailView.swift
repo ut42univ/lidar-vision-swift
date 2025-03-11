@@ -40,7 +40,7 @@ struct PhotoDetailView: View {
                     }
                 }
             }
-            .navigationTitle(showChatView ? "AIに質問" : "Photo Details")
+            .navigationTitle(showChatView ? "Ask AI" : "Photo Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -50,7 +50,7 @@ struct PhotoDetailView: View {
                 if !showChatView {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Toggle(isOn: $viewModel.autoPlay) {
-                            Label("自動読み上げ", systemImage: "speaker.wave.2")
+                            Label("Auto Speak", systemImage: "speaker.wave.2")
                                 .labelStyle(.iconOnly)
                         }
                         .toggleStyle(SwitchToggleStyle(tint: .blue))
@@ -72,7 +72,7 @@ struct PhotoDetailView: View {
                         }) {
                             HStack {
                                 Image(systemName: "chevron.left")
-                                Text("戻る")
+                                Text("Back")
                             }
                         }
                     }
@@ -97,7 +97,7 @@ struct PhotoDetailView: View {
         }) {
             HStack {
                 Image(systemName: "bubble.left.and.bubble.right.fill")
-                Text("AIに詳しく質問する")
+                Text("Ask AI for Details")
             }
             .padding()
             .frame(maxWidth: .infinity)

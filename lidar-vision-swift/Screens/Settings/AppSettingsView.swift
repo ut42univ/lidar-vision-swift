@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// アプリ全体の設定画面
+/// Application settings screen
 struct AppSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var settings: AppSettings
     @State private var showResetConfirmation = false
     
-    // 変更を受け取るコールバック
+    // Callback to receive changes
     var onSettingsChanged: (AppSettings) -> Void
     
     init(settings: AppSettings, onSettingsChanged: @escaping (AppSettings) -> Void) {
@@ -17,16 +17,16 @@ struct AppSettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                // 空間オーディオセクション
-                Section(header: Text("空間オーディオ")) {
-                    Toggle("空間オーディオを有効化", isOn: $settings.spatialAudio.isEnabled)
+                // Spatial audio section
+                Section(header: Text("Spatial Audio")) {
+                    Toggle("Enable Spatial Audio", isOn: $settings.spatialAudio.isEnabled)
                         .tint(.blue)
                         .onChange(of: settings.spatialAudio.isEnabled) {
                             onSettingsChanged(settings)
                         }
                     
                     VStack(alignment: .leading) {
-                        Text("音量: \(Int(settings.spatialAudio.volume * 100))%")
+                        Text("Volume: \(Int(settings.spatialAudio.volume * 100))%")
                         Slider(value: $settings.spatialAudio.volume, in: 0...1, step: 0.05)
                             .tint(.blue)
                             .onChange(of: settings.spatialAudio.volume) {
@@ -36,11 +36,11 @@ struct AppSettingsView: View {
                     .padding(.vertical, 4)
                 }
                 
-                // 距離のしきい値設定
-                Section(header: Text("距離のしきい値設定")) {
+                // Distance threshold settings
+                Section(header: Text("Distance Threshold Settings")) {
                     VStack(alignment: .leading) {
                         HStack {
-                            Text("近距離:")
+                            Text("Near distance:")
                             Spacer()
                             Text("\(String(format: "%.1f", settings.spatialAudio.nearThreshold))m")
                         }
@@ -54,7 +54,7 @@ struct AppSettingsView: View {
                     
                     VStack(alignment: .leading) {
                         HStack {
-                            Text("中距離:")
+                            Text("Medium distance:")
                             Spacer()
                             Text("\(String(format: "%.1f", settings.spatialAudio.mediumThreshold))m")
                         }
@@ -68,7 +68,7 @@ struct AppSettingsView: View {
                     
                     VStack(alignment: .leading) {
                         HStack {
-                            Text("最大検出距離:")
+                            Text("Maximum detection distance:")
                             Spacer()
                             Text("\(String(format: "%.1f", settings.spatialAudio.maxDistance))m")
                         }
@@ -81,11 +81,11 @@ struct AppSettingsView: View {
                     .padding(.vertical, 4)
                 }
                 
-                // 音響設定
-                Section(header: Text("音響設定")) {
+                // Audio settings
+                Section(header: Text("Sound Settings")) {
                     VStack(alignment: .leading) {
                         HStack {
-                            Text("高音 (近距離):")
+                            Text("High pitch (near):")
                             Spacer()
                             Text("\(Int(settings.audioTones.highFrequency))Hz")
                         }
@@ -99,7 +99,7 @@ struct AppSettingsView: View {
                     
                     VStack(alignment: .leading) {
                         HStack {
-                            Text("中音 (中距離):")
+                            Text("Medium pitch (medium):")
                             Spacer()
                             Text("\(Int(settings.audioTones.mediumFrequency))Hz")
                         }
@@ -113,7 +113,7 @@ struct AppSettingsView: View {
                     
                     VStack(alignment: .leading) {
                         HStack {
-                            Text("低音 (遠距離):")
+                            Text("Low pitch (far):")
                             Spacer()
                             Text("\(Int(settings.audioTones.lowFrequency))Hz")
                         }
@@ -126,18 +126,18 @@ struct AppSettingsView: View {
                     .padding(.vertical, 4)
                 }
                 
-                // 触覚フィードバック設定
-                Section(header: Text("触覚フィードバック")) {
-                    Toggle("触覚フィードバックを有効化", isOn: $settings.hapticFeedback.isEnabled)
+                // Haptic feedback settings
+                Section(header: Text("Haptic Feedback")) {
+                    Toggle("Enable Haptic Feedback", isOn: $settings.hapticFeedback.isEnabled)
                         .tint(.blue)
                         .onChange(of: settings.hapticFeedback.isEnabled) {
                             onSettingsChanged(settings)
                         }
                     
-                    Picker("近距離の強度", selection: $settings.hapticFeedback.nearIntensity) {
-                        Text("弱").tag(HapticIntensity.light)
-                        Text("中").tag(HapticIntensity.medium)
-                        Text("強").tag(HapticIntensity.heavy)
+                    Picker("Near distance intensity", selection: $settings.hapticFeedback.nearIntensity) {
+                        Text("Light").tag(HapticIntensity.light)
+                        Text("Medium").tag(HapticIntensity.medium)
+                        Text("Heavy").tag(HapticIntensity.heavy)
                     }
                     .pickerStyle(SegmentedPickerStyle())
                     .disabled(!settings.hapticFeedback.isEnabled)
@@ -145,10 +145,10 @@ struct AppSettingsView: View {
                         onSettingsChanged(settings)
                     }
                     
-                    Picker("中距離の強度", selection: $settings.hapticFeedback.mediumIntensity) {
-                        Text("弱").tag(HapticIntensity.light)
-                        Text("中").tag(HapticIntensity.medium)
-                        Text("強").tag(HapticIntensity.heavy)
+                    Picker("Medium distance intensity", selection: $settings.hapticFeedback.mediumIntensity) {
+                        Text("Light").tag(HapticIntensity.light)
+                        Text("Medium").tag(HapticIntensity.medium)
+                        Text("Heavy").tag(HapticIntensity.heavy)
                     }
                     .pickerStyle(SegmentedPickerStyle())
                     .disabled(!settings.hapticFeedback.isEnabled)
@@ -157,37 +157,37 @@ struct AppSettingsView: View {
                     }
                 }
                 
-                // 設定リセットボタン
+                // Reset settings button
                 Section {
                     Button(action: {
                         showResetConfirmation = true
                     }) {
                         HStack {
                             Spacer()
-                            Text("設定をリセット")
+                            Text("Reset Settings")
                                 .foregroundColor(.red)
                             Spacer()
                         }
                     }
                 }
             }
-            .navigationTitle("設定")
+            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完了") {
+                    Button("Done") {
                         dismiss()
                     }
                 }
             }
-            .alert("設定をリセット", isPresented: $showResetConfirmation) {
-                Button("キャンセル", role: .cancel) { }
-                Button("リセット", role: .destructive) {
+            .alert("Reset Settings", isPresented: $showResetConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Reset", role: .destructive) {
                     settings = AppSettings()
                     onSettingsChanged(settings)
                 }
             } message: {
-                Text("すべての設定をデフォルト値に戻します。この操作は元に戻せません。")
+                Text("This will reset all settings to their default values. This action cannot be undone.")
             }
         }
     }

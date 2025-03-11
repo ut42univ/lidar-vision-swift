@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// オーディオ設定画面
+/// Audio settings screen
 struct AudioSettingsView: View {
     @Binding var volume: Float
     @Binding var isEnabled: Bool
@@ -10,12 +10,12 @@ struct AudioSettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("空間オーディオ")) {
-                    Toggle("空間オーディオを有効化", isOn: $isEnabled)
+                Section(header: Text("Spatial Audio")) {
+                    Toggle("Enable Spatial Audio", isOn: $isEnabled)
                         .tint(.blue)
                     
                     VStack(alignment: .leading) {
-                        Text("音量: \(Int(volume * 100))%")
+                        Text("Volume: \(Int(volume * 100))%")
                         Slider(value: $volume, in: 0...1, step: 0.05)
                             .tint(.blue)
                     }
@@ -27,7 +27,7 @@ struct AudioSettingsView: View {
                         HStack {
                             Image(systemName: "airpodsmax")
                                 .foregroundColor(.blue)
-                            Text("AirPodsについて")
+                            Text("About AirPods")
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.caption)
@@ -36,24 +36,24 @@ struct AudioSettingsView: View {
                     }
                     
                     HStack {
-                        Text("状態:")
+                        Text("Status:")
                         Spacer()
-                        Text(isEnabled ? "有効" : "無効")
+                        Text(isEnabled ? "Enabled" : "Disabled")
                             .foregroundColor(isEnabled ? .green : .secondary)
                     }
                 }
                 
-                // 使い方セクション
-                Section(header: Text("使い方"), footer: Text("最適な体験のために、AirPods ProまたはAirPods Maxの使用をお勧めします。")) {
-                    // 使い方の説明内容
+                // Usage section
+                Section(header: Text("How to Use"), footer: Text("For optimal experience, we recommend using AirPods Pro or AirPods Max.")) {
+                    // Help content view
                     helpContentView
                 }
             }
-            .navigationTitle("オーディオ設定")
+            .navigationTitle("Audio Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完了") {
+                    Button("Done") {
                         dismiss()
                     }
                 }
@@ -65,24 +65,24 @@ struct AudioSettingsView: View {
         .presentationDetents([.medium, .large])
     }
     
-    // 使い方の説明を分離
+    // Help content view
     private var helpContentView: some View {
         VStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("空間オーディオの仕組み")
+                Text("How Spatial Audio Works")
                     .font(.headline)
                 
-                Text("障害物に近づくと、その方向から音が聞こえます。AirPods Proを使用すると、ヘッドの動きに合わせて音の方向が調整されます。")
+                Text("When you approach obstacles, you'll hear sound from their direction. With AirPods Pro, the sound direction adjusts according to your head movement.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
             .padding(.vertical, 4)
             
             VStack(alignment: .leading, spacing: 10) {
-                Text("音の意味")
+                Text("Sound Meanings")
                     .font(.headline)
                 
-                Text("・高音（近い）: 0.5m以内の障害物\n・中音（警告）: 0.5m～2m以内の障害物\n・低音（遠い）: 2m～5m以内の障害物")
+                Text("• High pitch (near): Obstacles within 0.5m\n• Medium pitch (warning): Obstacles within 0.5m-2m\n• Low pitch (far): Obstacles within 2m-5m")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }

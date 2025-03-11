@@ -33,7 +33,7 @@ struct ImageDescriptionView: View {
         Button(action: speakAction) {
             HStack(spacing: 5) {
                 Image(systemName: speechService.isPlaying ? "stop.fill" : "play.fill")
-                Text(speechService.isPlaying ? "停止" : "読み上げ")
+                Text(speechService.isPlaying ? "Stop" : "Speak")
             }
             .padding(.vertical, 6)
             .padding(.horizontal, 12)

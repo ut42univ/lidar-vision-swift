@@ -15,7 +15,7 @@ struct ContentView: View {
             // 深度表示
             VStack {
                 Spacer()
-                Text(String(format: "距離: %.2f m", viewModel.sessionService.centerDepth))
+                Text(String(format: "Distance: %.2f m", viewModel.sessionService.centerDepth))
                     .padding()
                     .background(Color.black.opacity(0.5))
                     .foregroundColor(.white)
@@ -91,12 +91,12 @@ struct ContentView: View {
                 }
             )
         }
-        .alert("3D空間オーディオ", isPresented: $showAirPodsAlert) {
-            Button("了解") {
+        .alert("3D Spatial Audio", isPresented: $showAirPodsAlert) {
+            Button("OK") {
                 viewModel.toggleSpatialAudio()
             }
         } message: {
-            Text("AirPodsまたはAirPods Proを装着すると、ヘッドトラッキングによる高度な空間オーディオが有効になります。ステレオイヤホンでも基本的な空間オーディオ機能は利用できます。")
+            Text("Advanced spatial audio with head tracking is available when using AirPods or AirPods Pro. Basic spatial audio is available with any stereo headphones.")
         }
     }
     
