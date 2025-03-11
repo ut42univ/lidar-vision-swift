@@ -1,10 +1,11 @@
+// リファクタリング後の ARSessionService
+// 責任を明確に分離し、重複コードを削除
+
 import Foundation
 import ARKit
 import RealityKit
-import CoreImage
-import UIKit
 
-/// AR機能のコアサービス
+/// AR機能のコアサービス - より焦点を絞ったバージョン
 final class ARSessionService: NSObject, ObservableObject {
     // 公開プロパティ
     @Published var centerDepth: Float = 0.0
@@ -12,18 +13,20 @@ final class ARSessionService: NSObject, ObservableObject {
     @Published var spatialAudioEnabled: Bool = false
     @Published var isSessionRunning: Bool = false
     
-    // 依存サービス
+    // 依存サービス - 注入可能にする
     private let meshService: MeshManagementService
     private let spatialAudioService: SpatialAudioService
+    private let depthProcessor: DepthDataProcessor
     
     // 内部状態
     weak var arView: ARView?
-    private let ciContext = CIContext()
     
     init(meshService: MeshManagementService = MeshManagementService(),
-         spatialAudioService: SpatialAudioService = SpatialAudioService()) {
+         spatialAudioService: SpatialAudioService = SpatialAudioService(),
+         depthProcessor: DepthDataProcessor = DepthDataProcessor()) {
         self.meshService = meshService
         self.spatialAudioService = spatialAudioService
+        self.depthProcessor = depthProcessor
         super.init()
     }
     
@@ -31,7 +34,23 @@ final class ARSessionService: NSObject, ObservableObject {
     func startSession(for arView: ARView) {
         self.arView = arView
         
-        // 設定の作成
+        // 設定を作成して適用
+        let configuration = createConfiguration()
+        updateMeshVisibility()
+        
+        arView.session.delegate = self
+        arView.session.run(configuration)
+        
+        // ビュー更新サイクルの外で状態を更新
+        DispatchQueue.main.async {
+            self.isSessionRunning = true
+        }
+        
+        setupMemoryWarningObserver()
+    }
+    
+    // 設定の作成を一箇所にまとめる
+    private func createConfiguration() -> ARWorldTrackingConfiguration {
         let configuration = ARWorldTrackingConfiguration()
         
         if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
@@ -43,12 +62,10 @@ final class ARSessionService: NSObject, ObservableObject {
             configuration.environmentTexturing = .automatic
         }
         
-        updateMeshVisibility()
-        
-        arView.session.delegate = self
-        arView.session.run(configuration)
-        
-        // メモリ警告通知リスナーを設定
+        return configuration
+    }
+    
+    private func setupMemoryWarningObserver() {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleMemoryWarning),
@@ -65,10 +82,12 @@ final class ARSessionService: NSObject, ObservableObject {
     
     /// メッシュの可視性を更新
     private func updateMeshVisibility() {
+        guard let arView = arView else { return }
+        
         if isMeshVisible {
-            arView?.debugOptions.insert(.showSceneUnderstanding)
+            arView.debugOptions.insert(.showSceneUnderstanding)
         } else {
-            arView?.debugOptions.remove(.showSceneUnderstanding)
+            arView.debugOptions.remove(.showSceneUnderstanding)
         }
     }
     
@@ -88,19 +107,14 @@ final class ARSessionService: NSObject, ObservableObject {
         spatialAudioService.setVolumeMultiplier(volume)
     }
     
-    /// AirPodsの接続を再確認
-    func recheckAirPodsConnection() {
-        // 簡素化版では何もしない
-    }
-    
     /// メッシュキャッシュをリセット
     func resetMeshCache() {
-        guard let arView = arView else { return }
-        
-        if let configuration = arView.session.configuration as? ARWorldTrackingConfiguration {
-            arView.session.run(configuration, options: [.resetSceneReconstruction])
-            meshService.clearMeshAnchors()
+        guard let arView = arView, let configuration = arView.session.configuration as? ARWorldTrackingConfiguration else {
+            return
         }
+        
+        arView.session.run(configuration, options: [.resetSceneReconstruction])
+        meshService.clearMeshAnchors()
     }
     
     /// メモリ警告の処理
@@ -111,30 +125,42 @@ final class ARSessionService: NSObject, ObservableObject {
     /// 写真を撮影
     func capturePhoto() -> UIImage? {
         guard let frame = arView?.session.currentFrame else { return nil }
-        let imageBuffer = frame.capturedImage
-        
-        let ciImage = CIImage(cvPixelBuffer: imageBuffer)
-        guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return nil }
-        
-        // デバイスの向きを考慮して画像の向きを調整
-        let orientation: UIImage.Orientation
-        
-        switch UIDevice.current.orientation {
-        case .portrait:
-            orientation = .right
-        case .portraitUpsideDown:
-            orientation = .left
-        case .landscapeLeft:
-            orientation = .down
-        case .landscapeRight:
-            orientation = .up
-        case .faceUp, .faceDown, .unknown:
-            orientation = .right // デフォルトはポートレート
-        @unknown default:
-            orientation = .right
+        return ImageCaptureHelper.createImage(from: frame)
+    }
+
+    /// ARセッションを一時停止
+    func pauseSession() {
+        if spatialAudioEnabled {
+            spatialAudioService.stopSpatialAudio()
         }
         
-        return UIImage(cgImage: cgImage, scale: 1.0, orientation: orientation)
+        arView?.session.pause()
+        
+        DispatchQueue.main.async {
+            self.isSessionRunning = false
+        }
+    }
+    
+    /// ARセッションを再開
+    func resumeSession() {
+        guard let arView = arView else { return }
+        
+        // ARセッションを再開
+        if let configuration = arView.session.configuration {
+            arView.session.run(configuration)
+        } else {
+            arView.session.run(createConfiguration())
+        }
+        
+        // 状態更新を分離
+        DispatchQueue.main.async {
+            self.isSessionRunning = true
+        }
+        
+        // 空間オーディオの復元
+        if spatialAudioEnabled {
+            spatialAudioService.startSpatialAudio()
+        }
     }
     
     deinit {
@@ -142,37 +168,21 @@ final class ARSessionService: NSObject, ObservableObject {
     }
 }
 
-// ARSessionDelegateの実装
+// MARK: - ARSessionDelegateの実装
 extension ARSessionService: ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        autoreleasepool {
-            updateDepthFromFrame(frame)
+        Task { @MainActor in
+            // 深度データの処理を専用クラスに委譲
+            if let depth = try? await depthProcessor.processDepthData(from: frame) {
+                centerDepth = depth
+            }
             
+            // 空間オーディオの更新
             if spatialAudioEnabled {
                 spatialAudioService.updateWithMeshData(
                     meshAnchors: meshService.meshAnchors,
                     cameraTransform: frame.camera.transform
                 )
-            }
-        }
-    }
-    
-    private func updateDepthFromFrame(_ frame: ARFrame) {
-        guard let sceneDepth = frame.sceneDepth else { return }
-        let depthMap = sceneDepth.depthMap
-        
-        let width = CVPixelBufferGetWidth(depthMap)
-        let height = CVPixelBufferGetHeight(depthMap)
-        
-        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
-        
-        if let baseAddress = CVPixelBufferGetBaseAddress(depthMap) {
-            let floatBuffer = baseAddress.assumingMemoryBound(to: Float32.self)
-            let centerIndex = (height / 2) * width + (width / 2)
-            let depthAtCenter = floatBuffer[centerIndex]
-            DispatchQueue.main.async {
-                self.centerDepth = depthAtCenter
             }
         }
     }
@@ -200,51 +210,63 @@ extension ARSessionService: ARSessionDelegate {
             }
         }
     }
-    
-    /// ARセッションを一時停止
-    func pauseSession() {
-        print("Pausing AR session")
-        
-        // 空間オーディオが有効な場合は停止
-        if spatialAudioEnabled {
-            toggleSpatialAudio() // 既存のトグルメソッドを使用して無効化
+}
+
+// 深度データ処理を独立したクラスに抽出
+class DepthDataProcessor {
+    /// フレームから深度情報を抽出
+    func processDepthData(from frame: ARFrame) async throws -> Float {
+        guard let sceneDepth = frame.sceneDepth else {
+            throw ARError(.invalidConfiguration)
         }
         
-        arView?.session.pause()
+        let depthMap = sceneDepth.depthMap
+        let width = CVPixelBufferGetWidth(depthMap)
+        let height = CVPixelBufferGetHeight(depthMap)
+        
+        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+        
+        guard let baseAddress = CVPixelBufferGetBaseAddress(depthMap) else {
+            throw ARError(.invalidConfiguration)
+        }
+        
+        let floatBuffer = baseAddress.assumingMemoryBound(to: Float32.self)
+        let centerIndex = (height / 2) * width + (width / 2)
+        return floatBuffer[centerIndex]
     }
-    /// ARセッションを再開
-    func resumeSession() {
-        guard let arView = arView else {
-            print("Cannot resume session: arView is nil")
-            return
+}
+
+// 画像キャプチャを独立したヘルパーに抽出
+enum ImageCaptureHelper {
+    static func createImage(from frame: ARFrame) -> UIImage? {
+        let imageBuffer = frame.capturedImage
+        let ciContext = CIContext()
+        
+        let ciImage = CIImage(cvPixelBuffer: imageBuffer)
+        guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else {
+            return nil
         }
         
-        print("Resuming AR session")
-        if let configuration = arView.session.configuration {
-            // 既存の設定を使って再開
-            arView.session.run(configuration)
-            isSessionRunning = true  // セッション再開時にフラグを更新
-        } else {
-            // 新しい設定で開始（万が一のため）
-            let configuration = ARWorldTrackingConfiguration()
-            
-            if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
-                configuration.frameSemantics.insert(.sceneDepth)
-            }
-            
-            if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
-                configuration.sceneReconstruction = .mesh
-                configuration.environmentTexturing = .automatic
-            }
-            
-            arView.session.run(configuration)
-            isSessionRunning = true  // セッション再開時にフラグを更新
-        }
-        
-        // セッション再開後、空間オーディオの状態を復元
-        // spatialAudioEnabledは設定上の値、this.spatialAudioEnabledは現在の実行状態
-        if spatialAudioEnabled && !self.spatialAudioEnabled {
-            toggleSpatialAudio() // 有効化
+        // デバイスの向きを考慮して画像の向きを調整
+        let orientation = determineImageOrientation()
+        return UIImage(cgImage: cgImage, scale: 1.0, orientation: orientation)
+    }
+    
+    private static func determineImageOrientation() -> UIImage.Orientation {
+        switch UIDevice.current.orientation {
+        case .portrait:
+            return .right
+        case .portraitUpsideDown:
+            return .left
+        case .landscapeLeft:
+            return .down
+        case .landscapeRight:
+            return .up
+        case .faceUp, .faceDown, .unknown:
+            return .right // デフォルトはポートレート
+        @unknown default:
+            return .right
         }
     }
 }

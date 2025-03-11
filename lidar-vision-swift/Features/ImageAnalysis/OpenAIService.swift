@@ -2,7 +2,16 @@ import Foundation
 import UIKit
 import Combine
 
-/// メッセージの種類
+/// OpenAI API関連エラー
+enum OpenAIServiceError: Error {
+    case invalidAPIKey
+    case imageConversionFailed
+    case networkError(Error)
+    case decodingError(Error)
+    case responseError(Int, String)
+    case unknownError
+}
+
 struct ChatMessage: Identifiable {
     let id = UUID()
     let content: String
@@ -23,71 +32,78 @@ final class OpenAIService: ObservableObject {
     
     init(apiKey: String? = nil) {
         // APIキーがパラメータとして渡された場合はそれを使用、そうでなければ環境から取得
-        if let providedKey = apiKey, !providedKey.isEmpty {
-            self.apiKey = providedKey
-            print("Using provided API key")
-        } else {
-            // APIキーを環境から取得
-            self.apiKey = AppEnvironment.openAIAPIKey
-            print("Using API key from environment")
-        }
+        self.apiKey = apiKey ?? AppEnvironment.openAIAPIKey
+        print("OpenAIService initialized")
     }
     
-    /// 画像を分析して説明を生成
+    /// 画像を分析して説明を生成 (async/await版)
     func analyzeImage(_ image: UIImage) {
-        print("Starting image analysis...")
-        
-        // APIキーチェック
-        if apiKey.isEmpty {
-            self.error = "No valid API key. Please check your Info.plist settings."
-            print("Invalid API key")
-            return
-        }
-        
-        guard let imageData = image.jpegData(compressionQuality: 0.7) else {
-            self.error = "Failed to convert image"
-            print("Failed to convert image to JPEG data")
-            return
-        }
-        
-        // 画像サイズをチェック (APIには制限があります)
-        let imageSizeKB = Double(imageData.count) / 1024.0
-        print("Image size: \(imageSizeKB) KB")
-        
-        // 大きすぎる場合は圧縮率を下げて再度試行
-        var finalImageData = imageData
-        if imageSizeKB > 20000 { // 20MB制限の仮定
-            print("Image too large, trying with lower quality")
-            guard let compressedData = image.jpegData(compressionQuality: 0.5) else {
-                self.error = "Failed to compress large image"
-                return
-            }
-            
-            let newSizeKB = Double(compressedData.count) / 1024.0
-            print("Compressed image size: \(newSizeKB) KB")
-            finalImageData = compressedData
-        }
-        
+        // UIの更新を即座に反映
         isLoading = true
         error = nil
         
-        // 会話履歴をリセット
-        messages.removeAll()
+        Task {
+            do {
+                // 非同期処理をTaskで実行
+                let description = try await performImageAnalysis(image)
+                
+                // UIの更新はメインスレッドで
+                await MainActor.run {
+                    self.imageDescription = description
+                    self.messages = [ChatMessage(content: description, isUser: false)]
+                    self.isLoading = false
+                }
+            } catch let error as OpenAIServiceError {
+                await handleError(error)
+            } catch {
+                await handleError(.unknownError)
+            }
+        }
+    }
+    
+    /// 画像分析を実行する内部メソッド
+    private func performImageAnalysis(_ image: UIImage) async throws -> String {
+        // APIキーチェック
+        if apiKey.isEmpty {
+            throw OpenAIServiceError.invalidAPIKey
+        }
+        
+        // 画像データの変換
+        guard let imageData = prepareImageData(from: image) else {
+            throw OpenAIServiceError.imageConversionFailed
+        }
         
         // Base64エンコード
-        let base64Image = finalImageData.base64EncodedString()
+        let base64Image = imageData.base64EncodedString()
         self.imageBase64 = base64Image
-        print("Image encoded to base64")
         
-        // リクエスト作成
-        let url = URL(string: "https://api.openai.com/v1/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        // APIリクエスト構築
+        let requestBody = buildAnalysisRequestBody(with: base64Image)
+        let request = try buildAPIRequest(with: requestBody)
         
-        // リクエストボディ作成
-        let requestBody: [String: Any] = [
+        // リクエスト送信と結果の解析
+        return try await sendRequest(request)
+    }
+    
+    /// 画像データを適切なサイズと品質で準備
+    private func prepareImageData(from image: UIImage) -> Data? {
+        // 基本の圧縮品質で試行
+        guard let imageData = image.jpegData(compressionQuality: 0.7) else {
+            return nil
+        }
+        
+        // サイズをチェックして必要なら圧縮率を下げる
+        let imageSizeKB = Double(imageData.count) / 1024.0
+        if imageSizeKB > 20000 { // 20MB制限
+            return image.jpegData(compressionQuality: 0.5)
+        }
+        
+        return imageData
+    }
+    
+    /// APIリクエストボディを構築
+    private func buildAnalysisRequestBody(with base64Image: String) -> [String: Any] {
+        return [
             "model": "gpt-4o",
             "messages": [
                 [
@@ -108,115 +124,89 @@ final class OpenAIService: ObservableObject {
             ],
             "max_tokens": 500
         ]
+    }
+    
+    /// URLRequestを構築
+    private func buildAPIRequest(with body: [String: Any]) throws -> URLRequest {
+        let url = URL(string: "https://api.openai.com/v1/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return request
+    }
+    
+    /// リクエストを送信して結果を解析
+    private func sendRequest(_ request: URLRequest) async throws -> String {
+        let (data, response) = try await URLSession.shared.data(for: request)
         
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-            print("Request body created successfully")
-        } catch {
-            self.error = "Request creation failed: \(error.localizedDescription)"
-            self.isLoading = false
-            print("Failed to create request body: \(error)")
-            return
+        // HTTPレスポンスの確認
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OpenAIServiceError.unknownError
         }
         
-        print("Sending API request to OpenAI...")
+        if httpResponse.statusCode != 200 {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw OpenAIServiceError.responseError(httpResponse.statusCode, errorMessage)
+        }
         
-        // APIリクエスト実行
-        URLSession.shared.dataTaskPublisher(for: request)
-            .map { data, response -> Data in
-                // HTTPレスポンスをデバッグ
-                if let httpResponse = response as? HTTPURLResponse {
-                    print("API Response Code: \(httpResponse.statusCode)")
-                    
-                    // エラーレスポンスをログに記録
-                    if httpResponse.statusCode != 200 {
-                        if let errorText = String(data: data, encoding: .utf8) {
-                            print("Error response: \(errorText)")
-                        }
-                    }
-                }
-                return data
+        // レスポンスの解析
+        do {
+            let result = try JSONDecoder().decode(OpenAIResponse.self, from: data)
+            if let content = result.choices.first?.message.content {
+                return content
+            } else {
+                throw OpenAIServiceError.unknownError
             }
-            .decode(type: OpenAIResponse.self, decoder: JSONDecoder())
-            .receive(on: DispatchQueue.main)
-            .sink(
-                receiveCompletion: { [weak self] completion in
-                    guard let self = self else { return }
-                    
-                    self.isLoading = false
-                    
-                    switch completion {
-                    case .finished:
-                        print("API request completed successfully")
-                    case .failure(let error):
-                        self.error = "API error: \(error.localizedDescription)"
-                        print("API request failed: \(error)")
-                        
-                        // デコードエラーの詳細を表示
-                        if let decodingError = error as? DecodingError {
-                            switch decodingError {
-                            case .dataCorrupted(let context):
-                                print("Data corrupted: \(context.debugDescription)")
-                            case .keyNotFound(let key, let context):
-                                print("Key not found: \(key.stringValue), context: \(context.debugDescription)")
-                            case .typeMismatch(let type, let context):
-                                print("Type mismatch: expected \(type), context: \(context.debugDescription)")
-                            case .valueNotFound(let type, let context):
-                                print("Value not found: expected \(type), context: \(context.debugDescription)")
-                            @unknown default:
-                                print("Unknown decoding error: \(decodingError)")
-                            }
-                        }
-                    }
-                },
-                receiveValue: { [weak self] response in
-                    guard let self = self else { return }
-                    
-                    if let content = response.choices.first?.message.content {
-                        print("Received description from API: \(content.prefix(50))...")
-                        self.imageDescription = content
-                        
-                        // 会話履歴に追加
-                        self.messages.append(ChatMessage(content: content, isUser: false))
-                    } else {
-                        self.error = "Failed to parse response"
-                        print("Failed to parse response: no content found")
-                    }
-                }
-            )
-            .store(in: &cancellables)
+        } catch {
+            throw OpenAIServiceError.decodingError(error)
+        }
     }
     
     /// AIに質問を送信
     func sendQuestion(_ question: String) {
-        print("Sending follow-up question to OpenAI...")
-        
-        // APIキーチェック
-        if apiKey.isEmpty {
-            self.error = "API key is required."
-            print("Invalid API key")
-            return
-        }
-        
         // 質問を会話履歴に追加
         let userMessage = ChatMessage(content: question, isUser: true)
         messages.append(userMessage)
-        
         isLoading = true
         error = nil
         
-        // メッセージ履歴を構築
-        var messageHistory: [[String: Any]] = []
+        Task {
+            do {
+                let messageHistory = buildMessageHistory(with: question)
+                let requestBody = [
+                    "model": "gpt-4o",
+                    "messages": messageHistory,
+                    "max_tokens": 500
+                ] as [String: Any]
+                
+                let request = try buildAPIRequest(with: requestBody)
+                let answer = try await sendRequest(request)
+                
+                await MainActor.run {
+                    self.messages.append(ChatMessage(content: answer, isUser: false))
+                    self.isLoading = false
+                }
+            } catch {
+                await handleError(.networkError(error))
+            }
+        }
+    }
+    
+    /// メッセージ履歴を構築
+    private func buildMessageHistory(with question: String? = nil) -> [[String: Any]] {
+        var history: [[String: Any]] = []
         
         // システムメッセージを追加
-        messageHistory.append([
+        history.append([
             "role": "system",
             "content": "You are a helpful assistant that helps blind users understand images and their surroundings. Answer questions based on the image that was shared earlier."
         ])
         
-        // 最初のメッセージ（画像付き）
+        // 画像メッセージを追加
         if let imageBase64 = self.imageBase64 {
-            messageHistory.append([
+            history.append([
                 "role": "user",
                 "content": [
                     [
@@ -234,91 +224,55 @@ final class OpenAIService: ObservableObject {
             
             // 最初のAI応答
             if !imageDescription.isEmpty {
-                messageHistory.append([
+                history.append([
                     "role": "assistant",
                     "content": imageDescription
                 ])
             }
         }
         
-        // それ以降の会話履歴（最初のAI応答以降）
+        // 既存の会話履歴を追加（最初のAI応答を除く）
         for i in 1..<messages.count {
             let message = messages[i]
-            let role = message.isUser ? "user" : "assistant"
-            messageHistory.append([
-                "role": role,
+            history.append([
+                "role": message.isUser ? "user" : "assistant",
                 "content": message.content
             ])
         }
         
-        // リクエスト作成
-        let url = URL(string: "https://api.openai.com/v1/chat/completions")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        
-        // リクエストボディ作成
-        let requestBody: [String: Any] = [
-            "model": "gpt-4o",
-            "messages": messageHistory,
-            "max_tokens": 500
-        ]
-        
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-            print("Follow-up request created successfully")
-        } catch {
-            self.error = "Request creation failed: \(error.localizedDescription)"
-            self.isLoading = false
-            print("Failed to create request body: \(error)")
-            return
+        // 現在の質問を追加
+        if let question = question {
+            history.append([
+                "role": "user",
+                "content": question
+            ])
         }
         
-        // APIリクエスト実行
-        URLSession.shared.dataTaskPublisher(for: request)
-            .map { data, response -> Data in
-                if let httpResponse = response as? HTTPURLResponse {
-                    print("API Response Code: \(httpResponse.statusCode)")
-                    if httpResponse.statusCode != 200 {
-                        if let errorText = String(data: data, encoding: .utf8) {
-                            print("Error response: \(errorText)")
-                        }
-                    }
-                }
-                return data
-            }
-            .decode(type: OpenAIResponse.self, decoder: JSONDecoder())
-            .receive(on: DispatchQueue.main)
-            .sink(
-                receiveCompletion: { [weak self] completion in
-                    guard let self = self else { return }
-                    
-                    self.isLoading = false
-                    
-                    switch completion {
-                    case .finished:
-                        print("Follow-up request completed successfully")
-                    case .failure(let error):
-                        self.error = "API error: \(error.localizedDescription)"
-                        print("API request failed: \(error)")
-                    }
-                },
-                receiveValue: { [weak self] response in
-                    guard let self = self else { return }
-                    
-                    if let content = response.choices.first?.message.content {
-                        print("Received response from API: \(content.prefix(50))...")
-                        
-                        // 会話履歴に追加
-                        self.messages.append(ChatMessage(content: content, isUser: false))
-                    } else {
-                        self.error = "Failed to parse response: no content found"
-                        print("Failed to parse response: no content found")
-                    }
-                }
-            )
-            .store(in: &cancellables)
+        return history
+    }
+    
+    /// エラー処理
+    @MainActor
+    private func handleError(_ serviceError: OpenAIServiceError) {
+        let errorMessage: String
+        
+        switch serviceError {
+        case .invalidAPIKey:
+            errorMessage = "API key is missing or invalid. Please check your settings."
+        case .imageConversionFailed:
+            errorMessage = "Failed to process the image. Please try again with a different image."
+        case .networkError(let error):
+            errorMessage = "Network error: \(error.localizedDescription)"
+        case .decodingError(let error):
+            errorMessage = "Failed to process API response: \(error.localizedDescription)"
+        case .responseError(let code, _):
+            errorMessage = "API error (code \(code)). Please try again later."
+        case .unknownError:
+            errorMessage = "An unknown error occurred. Please try again."
+        }
+        
+        self.error = errorMessage
+        self.isLoading = false
     }
     
     /// 会話履歴をリセット

@@ -1,8 +1,9 @@
 import Foundation
 import UIKit
+import Combine
 
-/// 触覚フィードバックの強度
-enum HapticIntensity: String, Codable {
+/// 触覚フィードバックの強度 - 列挙型を使用して明確化
+enum HapticIntensity: String, Codable, CaseIterable {
     case light
     case medium
     case heavy
@@ -14,73 +15,179 @@ enum HapticIntensity: String, Codable {
         case .heavy: return .heavy
         }
     }
+    
+    var displayName: String {
+        switch self {
+        case .light: return "Light"
+        case .medium: return "Medium"
+        case .heavy: return "Heavy"
+        }
+    }
 }
 
-/// アプリケーション全体の設定を管理するモデル
-struct AppSettings: Codable {
-    // 空間オーディオ設定
+/// アプリケーション設定 - UserDefaultsとの同期を改善
+final class AppSettings: ObservableObject, Codable {
+    // MARK: - Nested Settings Structures
+    
+    /// 空間オーディオ設定
     struct SpatialAudio: Codable {
         var isEnabled: Bool = false
         var volume: Float = 0.8
-        var maxDistance: Float = 5.0 // 最大検出距離（メートル）
-        var nearThreshold: Float = 0.5 // 近い障害物の閾値
-        var mediumThreshold: Float = 2.0 // 中間距離の閾値
+        var maxDistance: Float = 5.0
+        var nearThreshold: Float = 0.5
+        var mediumThreshold: Float = 2.0
+        
+        // 値の検証を追加
+        mutating func validate() {
+            volume = max(0, min(1, volume))
+            maxDistance = max(1, min(10, maxDistance))
+            nearThreshold = max(0.1, min(1, nearThreshold))
+            mediumThreshold = max(1, min(maxDistance - 0.5, mediumThreshold))
+        }
     }
     
-    // 音響トーン設定
+    /// 音響トーン設定
     struct AudioTones: Codable {
-        var highFrequency: Float = 880.0  // 高音（近距離用）
-        var mediumFrequency: Float = 440.0 // 中音（中距離用）
-        var lowFrequency: Float = 220.0   // 低音（遠距離用）
+        var highFrequency: Float = 880.0
+        var mediumFrequency: Float = 440.0
+        var lowFrequency: Float = 220.0
+        
+        // 値の検証を追加
+        mutating func validate() {
+            highFrequency = max(500, min(1200, highFrequency))
+            mediumFrequency = max(300, min(700, mediumFrequency))
+            lowFrequency = max(100, min(400, lowFrequency))
+        }
     }
     
+    /// 触覚フィードバック設定
     struct HapticFeedback: Codable {
         var isEnabled: Bool = true
-        // 振動を開始する距離 (メートル)
         var startDistance: Float = 3.0
-        
-        // 内部で使用する強度値 (UI露出なし)
         var nearIntensity: HapticIntensity = .heavy
         var mediumIntensity: HapticIntensity = .medium
-        var nearInterval: TimeInterval = 0.1  // 近距離の振動間隔（秒）
-        var mediumInterval: TimeInterval = 0.3 // 中距離の振動間隔（秒）
+        var nearInterval: TimeInterval = 0.1
+        var mediumInterval: TimeInterval = 0.3
+        var useCoreHaptics: Bool = true
+        var powerSavingMode: Bool = false
+        var intensityMultiplier: Float = 1.0
         
-        // 追加: パフォーマンス最適化設定
-        var useCoreHaptics: Bool = true // CoreHapticsが使用可能な場合に使用するか
-        var powerSavingMode: Bool = false // バッテリー節約モード（振動を減らす）
-        
-        // 追加: アクセシビリティ調整
-        var intensityMultiplier: Float = 1.0 // 全体的な強度調整（0.5-1.5）
+        // 値の検証を追加
+        mutating func validate() {
+            startDistance = max(0.5, min(5, startDistance))
+            nearInterval = max(0.05, min(0.5, nearInterval))
+            mediumInterval = max(0.1, min(1, mediumInterval))
+            intensityMultiplier = max(0.5, min(1.5, intensityMultiplier))
+        }
     }
     
-    // テキスト読み上げ設定
+    /// テキスト読み上げ設定
     struct TextToSpeech: Codable {
-        var rate: Float = 0.5 // 読み上げ速度 (0.0 - 1.0)
-        var pitch: Float = 1.0 // 音の高さ (0.5 - 2.0)
-        var volume: Float = 0.8 // 音量 (0.0 - 1.0)
-        var language: String = "en-US" // デフォルト言語
+        var rate: Float = 0.5
+        var pitch: Float = 1.0
+        var volume: Float = 0.8
+        var language: String = "en-US"
         
-        // サポートされている言語
-        static let supportedLanguages = [
-            "en-US": "English (US)",
-            "ja-JP": "日本語",
-            "en-GB": "English (UK)",
-            "fr-FR": "Français",
-            "de-DE": "Deutsch",
-            "zh-CN": "中文 (简体)",
-            "es-ES": "Español"
-        ]
+        // サポートされている言語の定義を静的プロパティから計算プロパティに変更
+        static var supportedLanguages: [String: String] {
+            [
+                "en-US": "English (US)",
+                "ja-JP": "日本語",
+                "en-GB": "English (UK)",
+                "fr-FR": "Français",
+                "de-DE": "Deutsch",
+                "zh-CN": "中文 (简体)",
+                "es-ES": "Español"
+            ]
+        }
+        
+        // 値の検証を追加
+        mutating func validate() {
+            rate = max(0.1, min(1, rate))
+            pitch = max(0.5, min(2, pitch))
+            volume = max(0, min(1, volume))
+            
+            // 言語が有効でなければデフォルトに戻す
+            if !Self.supportedLanguages.keys.contains(language) {
+                language = "en-US"
+            }
+        }
     }
     
-    var spatialAudio = SpatialAudio()
-    var audioTones = AudioTones()
-    var hapticFeedback = HapticFeedback()
-    var textToSpeech = TextToSpeech()
+    // MARK: - Properties
     
-    // MARK: - 永続化
+    @Published var spatialAudio = SpatialAudio()
+    @Published var audioTones = AudioTones()
+    @Published var hapticFeedback = HapticFeedback()
+    @Published var textToSpeech = TextToSpeech()
+    
+    private var cancellables = Set<AnyCancellable>()
+    private let saveSubject = PassthroughSubject<Void, Never>()
+    
+    // MARK: - Initialization
+    
+    init() {
+        setupAutosave()
+    }
+    
+    // MARK: - Autosave
+    
+    private func setupAutosave() {
+        // 設定変更を監視して自動保存
+        let publishers: [AnyPublisher<Void, Never>] = [
+            $spatialAudio.dropFirst().map { _ in }.eraseToAnyPublisher(),
+            $audioTones.dropFirst().map { _ in }.eraseToAnyPublisher(),
+            $hapticFeedback.dropFirst().map { _ in }.eraseToAnyPublisher(),
+            $textToSpeech.dropFirst().map { _ in }.eraseToAnyPublisher(),
+            saveSubject.eraseToAnyPublisher()
+        ]
+        
+        Publishers.MergeMany(publishers)
+            .debounce(for: .seconds(0.5), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.save()
+            }
+            .store(in: &cancellables)
+    }
+    
+    // MARK: - Settings Operations
+    
+    /// 設定をデフォルト値にリセット
+    func resetToDefaults() {
+        spatialAudio = SpatialAudio()
+        audioTones = AudioTones()
+        hapticFeedback = HapticFeedback()
+        textToSpeech = TextToSpeech()
+        
+        // 明示的に保存をトリガー
+        saveSubject.send()
+    }
+    
+    /// 空間オーディオの状態を切り替え
+    func toggleSpatialAudio() {
+        spatialAudio.isEnabled.toggle()
+    }
+    
+    /// 触覚フィードバックの状態を切り替え
+    func toggleHapticFeedback() {
+        hapticFeedback.isEnabled.toggle()
+    }
+    
+    /// すべての設定値を検証
+    func validateAllSettings() {
+        spatialAudio.validate()
+        audioTones.validate()
+        hapticFeedback.validate()
+        textToSpeech.validate()
+    }
+    
+    // MARK: - Persistence
     
     /// 設定を保存
     func save() {
+        // 保存前に値を検証
+        validateAllSettings()
+        
         do {
             let data = try JSONEncoder().encode(self)
             UserDefaults.standard.set(data, forKey: "AppSettings")
@@ -98,10 +205,37 @@ struct AppSettings: Codable {
         }
         
         do {
-            return try JSONDecoder().decode(AppSettings.self, from: data)
+            let settings = try JSONDecoder().decode(AppSettings.self, from: data)
+            // ロード後に値を検証
+            settings.validateAllSettings()
+            return settings
         } catch {
             print("設定の読み込みに失敗しました: \(error)")
             return AppSettings()
         }
+    }
+    
+    // MARK: - Codable
+    
+    enum CodingKeys: String, CodingKey {
+        case spatialAudio, audioTones, hapticFeedback, textToSpeech
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(spatialAudio, forKey: .spatialAudio)
+        try container.encode(audioTones, forKey: .audioTones)
+        try container.encode(hapticFeedback, forKey: .hapticFeedback)
+        try container.encode(textToSpeech, forKey: .textToSpeech)
+    }
+    
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        spatialAudio = try container.decode(SpatialAudio.self, forKey: .spatialAudio)
+        audioTones = try container.decode(AudioTones.self, forKey: .audioTones)
+        hapticFeedback = try container.decode(HapticFeedback.self, forKey: .hapticFeedback)
+        textToSpeech = try container.decode(TextToSpeech.self, forKey: .textToSpeech)
+        
+        setupAutosave()
     }
 }
