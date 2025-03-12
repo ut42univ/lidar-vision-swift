@@ -98,8 +98,6 @@ final class SpatialAudioService {
         let farBuffer = generateToneBuffer(frequency: settings.audioTones.lowFrequency, duration: 1.0)
         
         toneBuffers = AudioToneBuffers(near: nearBuffer, medium: mediumBuffer, far: farBuffer)
-        
-        // デフォルトバッファを設定
         currentBuffer = farBuffer
     }
     
@@ -112,48 +110,34 @@ final class SpatialAudioService {
         guard let buffer = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: frameCount) else { return nil }
         
         buffer.frameLength = frameCount
-        
-        let omega = 2.0 * Float.pi * frequency
-        
-        // フェードイン/アウト用のサンプル数
-        let fadeInSamples = min(Int(0.01 * Float(sampleRate)), Int(frameCount) / 10)
-        let fadeOutSamples = min(Int(0.01 * Float(sampleRate)), Int(frameCount) / 10)
-        
-        // SIMD操作で一度に複数のサンプルを処理
-        guard let floatChannelData = buffer.floatChannelData else { return nil }
-        
-        // SIMD処理のための準備
-        let sampleCount = Int(frameCount)
-        _ = SIMD16<Float>(
-            0/16, 1/16, 2/16, 3/16, 4/16, 5/16, 6/16, 7/16,
-            8/16, 9/16, 10/16, 11/16, 12/16, 13/16, 14/16, 15/16
-        )
-        
-        // バッファ処理をチャンク単位で実行
-        for base in stride(from: 0, to: sampleCount, by: 16) {
-            let remainingSamples = min(16, sampleCount - base)
-            
-            // 通常のサンプル生成
-            for i in 0..<remainingSamples {
-                let frame = base + i
-                let value = sin(omega * Float(frame) / Float(sampleRate))
-                
-                // フェードイン/アウト適用
-                var amplitude: Float = 1.0
-                if frame < fadeInSamples {
-                    amplitude = Float(frame) / Float(fadeInSamples)
-                } else if frame > sampleCount - fadeOutSamples {
-                    let fadeOutPosition = frame - (sampleCount - fadeOutSamples)
-                    amplitude = 1.0 - (Float(fadeOutPosition) / Float(fadeOutSamples))
-                }
-                
-                // 両チャンネルに値を設定
-                floatChannelData[0][frame] = value * amplitude
-                floatChannelData[1][frame] = value * amplitude
-            }
-        }
+        generateWaveform(in: buffer, frequency: frequency, sampleRate: sampleRate)
         
         return buffer
+    }
+    
+    private func generateWaveform(in buffer: AVAudioPCMBuffer, frequency: Float, sampleRate: Double) {
+        let omega = 2.0 * Float.pi * frequency
+        let fadeInSamples = min(Int(0.01 * Float(sampleRate)), Int(buffer.frameLength) / 10)
+        let fadeOutSamples = min(Int(0.01 * Float(sampleRate)), Int(buffer.frameLength) / 10)
+        
+        guard let floatChannelData = buffer.floatChannelData else { return }
+        
+        for frame in 0..<Int(buffer.frameLength) {
+            let value = sin(omega * Float(frame) / Float(sampleRate))
+            
+            // フェードイン/アウト適用
+            var amplitude: Float = 1.0
+            if frame < fadeInSamples {
+                amplitude = Float(frame) / Float(fadeInSamples)
+            } else if frame > Int(buffer.frameLength) - fadeOutSamples {
+                let fadeOutPosition = frame - (Int(buffer.frameLength) - fadeOutSamples)
+                amplitude = 1.0 - (Float(fadeOutPosition) / Float(fadeOutSamples))
+            }
+            
+            // 両チャンネルに値を設定
+            floatChannelData[0][frame] = value * amplitude
+            floatChannelData[1][frame] = value * amplitude
+        }
     }
     
     // MARK: - 公開メソッド

@@ -21,43 +21,49 @@ struct ChatMessage: Identifiable {
 
 /// OpenAI APIを使用した画像分析と会話サービス
 final class OpenAIService: ObservableObject {
+    // MARK: - Published Properties
+    
     @Published var isLoading = false
     @Published var imageDescription: String = ""
     @Published var error: String? = nil
     @Published var messages: [ChatMessage] = []
     
+    // MARK: - Properties
+    
     private var cancellables = Set<AnyCancellable>()
     private let apiKey: String
     private var imageBase64: String? = nil
     
+    // MARK: - Initialization
+    
     init(apiKey: String? = nil) {
         // APIキーがパラメータとして渡された場合はそれを使用、そうでなければ環境から取得
-        self.apiKey = apiKey ?? AppEnvironment.openAIAPIKey
-        print("OpenAIService initialized")
+        self.apiKey = apiKey ?? AppEnvironment.openAIAPIKey ?? ""
+        
+        if self.apiKey.isEmpty {
+            self.error = "API key is not configured"
+        }
     }
     
-    /// 画像を分析して説明を生成 (async/await版)
+    // MARK: - Public Methods
+    
+    /// 画像を分析して説明を生成
     func analyzeImage(_ image: UIImage) {
-        // UIの更新を即座に反映
-        isLoading = true
-        error = nil
-        
-        Task {
+        Task { @MainActor in
+            isLoading = true
+            error = nil
+            
             do {
-                // 非同期処理をTaskで実行
                 let description = try await performImageAnalysis(image)
-                
-                // UIの更新はメインスレッドで
-                await MainActor.run {
-                    self.imageDescription = description
-                    self.messages = [ChatMessage(content: description, isUser: false)]
-                    self.isLoading = false
-                }
+                self.imageDescription = description
+                self.messages = [ChatMessage(content: description, isUser: false)]
             } catch let error as OpenAIServiceError {
-                await handleError(error)
+                handleError(error)
             } catch {
-                await handleError(.unknownError)
+                handleError(.unknownError)
             }
+            
+            self.isLoading = false
         }
     }
     
@@ -87,18 +93,19 @@ final class OpenAIService: ObservableObject {
     
     /// 画像データを適切なサイズと品質で準備
     private func prepareImageData(from image: UIImage) -> Data? {
-        // 基本の圧縮品質で試行
-        guard let imageData = image.jpegData(compressionQuality: 0.7) else {
-            return nil
+        // 段階的な圧縮によるアプローチ
+        let compressionLevels: [CGFloat] = [0.8, 0.6, 0.4, 0.2]
+        let targetSize: Int = 20_000 * 1024 // 20MB
+        
+        for quality in compressionLevels {
+            if let data = image.jpegData(compressionQuality: quality),
+               data.count <= targetSize {
+                return data
+            }
         }
         
-        // サイズをチェックして必要なら圧縮率を下げる
-        let imageSizeKB = Double(imageData.count) / 1024.0
-        if imageSizeKB > 20000 { // 20MB制限
-            return image.jpegData(compressionQuality: 0.5)
-        }
-        
-        return imageData
+        // 最低品質でも試す
+        return image.jpegData(compressionQuality: 0.1)
     }
     
     /// APIリクエストボディを構築

@@ -8,50 +8,51 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            // ARView
-            ARViewContainer(sessionService: viewModel.sessionService)
-                .ignoresSafeArea()
-            
-            // UI要素を重ねる
-            VStack {
-                // 上部コントローラー
-                HeaderControls()
-                
-                Spacer()
-                
-                // 距離表示
-                DistanceDisplay(depth: viewModel.sessionService.centerDepth)
-            }
+            arView
+            overlayControls
         }
-        // 中央の十字マーカーをオーバーレイ
-        .overlay(
-            CrossMarker(color: viewModel.alertColor),
-            alignment: .center
-        )
-        // カメラボタンをオーバーレイ
-        .overlay(
-            CameraButtonView(),
-            alignment: .bottomLeading
-        )
-        // 画面遷移設定
+        .overlay(centerMarker, alignment: .center)
+        .overlay(cameraButton, alignment: .bottomLeading)
         .presentationModifiers()
-        // アラート設定
         .alert("3D Spatial Audio", isPresented: $showAirPodsAlert) {
-            Button("OK") {
-                viewModel.toggleSpatialAudio()
-            }
+            Button("OK") { viewModel.toggleSpatialAudio() }
         } message: {
             Text("Advanced spatial audio with head tracking is available when using AirPods or AirPods Pro. Basic spatial audio is available with any stereo headphones.")
         }
-        // ライフサイクル設定
-        .onAppear {
-            viewModel.resumeARSession()
-        }
-        .onDisappear {
-            viewModel.pauseARSession()
-        }
-        // 環境設定
+        .onAppear { viewModel.resumeARSession() }
+        .onDisappear { viewModel.pauseARSession() }
         .environmentObject(viewModel)
+    }
+    
+    // コンポーネントを分割
+    private var arView: some View {
+        ARViewContainer(sessionService: viewModel.sessionService)
+            .ignoresSafeArea()
+    }
+    
+    private var overlayControls: some View {
+        VStack {
+            HeaderControls()
+            Spacer()
+            depthDisplay
+        }
+    }
+    
+    private var depthDisplay: some View {
+        Text(String(format: "Distance: %.2f m", viewModel.sessionService.centerDepth))
+            .padding()
+            .background(Color.black.opacity(0.5))
+            .foregroundColor(.white)
+            .cornerRadius(8)
+            .padding(.bottom, 20)
+    }
+    
+    private var centerMarker: some View {
+        CrossMarker(color: .white)
+    }
+    
+    private var cameraButton: some View {
+        CameraButtonView()
     }
     
     // MARK: - サブビュー

@@ -3,52 +3,53 @@ import Combine
 
 /// メイン画面のViewModel
 final class ContentViewModel: ObservableObject {
-    // 公開プロパティ
+    // MARK: - Published Properties
+    
     @Published var capturedImage: UIImage?
     @Published var showPhotoDetail = false
     @Published var showSettings = false
     @Published var appSettings: AppSettings
     
-    // サービス参照
+    // MARK: - Dependencies
+    
     let sessionService: ARSessionService
     private let feedbackService: FeedbackService
     private let spatialAudioService: SpatialAudioService
     
-    // 内部状態
+    // MARK: - Properties
+    
     private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - Initialization
     
     init(
         sessionService: ARSessionService? = nil,
         feedbackService: FeedbackService? = nil,
         spatialAudioService: SpatialAudioService? = nil
     ) {
-        print("ContentViewModel initializing")
-        
         // 設定をロード
         let loadedSettings = AppSettings.load()
         self.appSettings = loadedSettings
         
-        // 依存サービスの初期化（依存性注入対応）
+        // 依存サービスの初期化
         self.spatialAudioService = spatialAudioService ?? SpatialAudioService(settings: loadedSettings)
         self.feedbackService = feedbackService ?? FeedbackService(settings: loadedSettings)
         self.sessionService = sessionService ?? ARSessionService(
             spatialAudioService: self.spatialAudioService
         )
         
-        // セッションの変更を監視
-        setupSessionBindings()
-        
-        // アプリのライフサイクルを監視
+        // 初期設定
+        setupBindings()
         setupLifecycleObservers()
-        
-        // 空間オーディオの設定を反映
         applyInitialSettings()
         
         // フィードバックサービスをアクティブ化
         self.feedbackService.activateFeedback()
     }
     
-    private func setupSessionBindings() {
+    // MARK: - Setup Methods
+    
+    private func setupBindings() {
         // セッションの変更を監視 - メインスレッドでの処理を保証
         sessionService.objectWillChange
             .receive(on: RunLoop.main)  // メインスレッドでの処理を保証
@@ -92,6 +93,8 @@ final class ContentViewModel: ObservableObject {
         sessionService.spatialAudioEnabled = appSettings.spatialAudio.isEnabled
         spatialAudioService.setVolumeMultiplier(appSettings.spatialAudio.volume)
     }
+    
+    // MARK: - Public API
     
     /// ARセッションを一時停止
     func pauseARSession() {
@@ -218,10 +221,5 @@ extension ContentViewModel {
     // 空間オーディオの有効状態を取得
     var isSpatialAudioEnabled: Bool {
         sessionService.spatialAudioEnabled
-    }
-    
-    // アラートカラー（固定値を計算プロパティに）
-    var alertColor: Color {
-        .white
     }
 }

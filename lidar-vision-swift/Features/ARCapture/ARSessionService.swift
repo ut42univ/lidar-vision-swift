@@ -7,19 +7,24 @@ import RealityKit
 
 /// AR機能のコアサービス - より焦点を絞ったバージョン
 final class ARSessionService: NSObject, ObservableObject {
-    // 公開プロパティ
+    // MARK: - Published Properties
+    
     @Published var centerDepth: Float = 0.0
     @Published var isMeshVisible: Bool = true
     @Published var spatialAudioEnabled: Bool = false
     @Published var isSessionRunning: Bool = false
     
-    // 依存サービス - 注入可能にする
+    // MARK: - Dependencies
+    
     private let meshService: MeshManagementService
     private let spatialAudioService: SpatialAudioService
     private let depthProcessor: DepthDataProcessor
     
-    // 内部状態
+    // MARK: - Properties
+    
     weak var arView: ARView?
+    
+    // MARK: - Lifecycle
     
     init(meshService: MeshManagementService = MeshManagementService(),
          spatialAudioService: SpatialAudioService = SpatialAudioService(),
@@ -65,15 +70,6 @@ final class ARSessionService: NSObject, ObservableObject {
         return configuration
     }
     
-    private func setupMemoryWarningObserver() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleMemoryWarning),
-            name: UIApplication.didReceiveMemoryWarningNotification,
-            object: nil
-        )
-    }
-    
     /// 3Dメッシュの可視性を切り替え
     func toggleMeshVisibility() {
         isMeshVisible.toggle()
@@ -117,11 +113,6 @@ final class ARSessionService: NSObject, ObservableObject {
         meshService.clearMeshAnchors()
     }
     
-    /// メモリ警告の処理
-    @objc private func handleMemoryWarning() {
-        resetMeshCache()
-    }
-    
     /// 写真を撮影
     func capturePhoto() -> UIImage? {
         guard let frame = arView?.session.currentFrame else { return nil }
@@ -161,6 +152,21 @@ final class ARSessionService: NSObject, ObservableObject {
         if spatialAudioEnabled {
             spatialAudioService.startSpatialAudio()
         }
+    }
+    
+    // MARK: - Memory Management
+        
+    private func setupMemoryWarningObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMemoryWarning),
+            name: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil
+        )
+    }
+        
+    @objc private func handleMemoryWarning() {
+        resetMeshCache()
     }
     
     deinit {

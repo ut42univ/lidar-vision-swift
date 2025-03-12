@@ -191,26 +191,27 @@ final class AppSettings: ObservableObject, Codable {
         do {
             let data = try JSONEncoder().encode(self)
             UserDefaults.standard.set(data, forKey: "AppSettings")
-            print("設定を保存しました")
         } catch {
-            print("設定の保存に失敗しました: \(error)")
+            #if DEBUG
+            assertionFailure("Failed to save settings: \(error)")
+            #endif
         }
     }
     
     /// 設定をロード
     static func load() -> AppSettings {
         guard let data = UserDefaults.standard.data(forKey: "AppSettings") else {
-            print("保存された設定がないため、デフォルト設定を使用します")
             return AppSettings()
         }
         
         do {
             let settings = try JSONDecoder().decode(AppSettings.self, from: data)
-            // ロード後に値を検証
             settings.validateAllSettings()
             return settings
         } catch {
-            print("設定の読み込みに失敗しました: \(error)")
+            #if DEBUG
+            assertionFailure("Failed to load settings: \(error)")
+            #endif
             return AppSettings()
         }
     }
