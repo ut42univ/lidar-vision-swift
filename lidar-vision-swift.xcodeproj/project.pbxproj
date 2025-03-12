@@ -19,7 +19,7 @@
 		96A25A462D7C1E8D00BDD948 /* Exceptions for "lidar-vision-swift" folder in "lidar-vision-swift" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				"Core/UIDeviceOrientation+Extensions.swift",
+				"Extensions/UIDeviceOrientation+Extensions.swift",
 				Info.plist,
 			);
 			target = 9691F9D42D71C97600F277BD /* lidar-vision-swift */;
@@ -274,7 +274,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"lidar-vision-swift/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"lidar-vision-swift/App\"";
 				DEVELOPMENT_TEAM = M3ULZV9WTP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -308,7 +308,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"lidar-vision-swift/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"lidar-vision-swift/App\"";
 				DEVELOPMENT_TEAM = M3ULZV9WTP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
