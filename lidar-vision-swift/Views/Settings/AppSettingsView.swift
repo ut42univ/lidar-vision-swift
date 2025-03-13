@@ -18,142 +18,97 @@ struct AppSettingsView: View {
         NavigationView {
             Form {
                 // Spatial audio section
-                Section(header: Text("Spatial Audio")) {
-                    Toggle("Enable Spatial Audio", isOn: $settings.spatialAudio.isEnabled)
-                        .tint(.blue)
-                        .onChange(of: settings.spatialAudio.isEnabled) {
-                            onSettingsChanged(settings)
-                        }
-                    
-                    VStack(alignment: .leading) {
-                        Text("Volume: \(Int(settings.spatialAudio.volume * 100))%")
-                        Slider(value: $settings.spatialAudio.volume, in: 0...1, step: 0.05)
+                Section {
+                    HStack {
+                        Image(systemName: "speaker.wave.3")
+                            .foregroundColor(.blue)
+                            .accessibility(hidden: true)
+                        Toggle("Enable Spatial Audio", isOn: $settings.spatialAudio.isEnabled)
                             .tint(.blue)
-                            .onChange(of: settings.spatialAudio.volume) {
+                            .onChange(of: settings.spatialAudio.isEnabled) { _, _ in
                                 onSettingsChanged(settings)
                             }
                     }
-                    .padding(.vertical, 4)
-                }
-                
-                // Distance threshold settings
-                Section(header: Text("Distance Threshold Settings")) {
-                    VStack(alignment: .leading) {
-                        HStack {
-                            Text("Near distance:")
-                            Spacer()
-                            Text("\(String(format: "%.1f", settings.spatialAudio.nearThreshold))m")
-                        }
-                        Slider(value: $settings.spatialAudio.nearThreshold, in: 0.1...1.0, step: 0.1)
-                            .tint(.red)
-                            .onChange(of: settings.spatialAudio.nearThreshold) {
-                                onSettingsChanged(settings)
-                            }
-                    }
-                    .padding(.vertical, 4)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityHint("Toggles spatial audio feedback for obstacle detection")
                     
                     VStack(alignment: .leading) {
                         HStack {
-                            Text("Medium distance:")
-                            Spacer()
-                            Text("\(String(format: "%.1f", settings.spatialAudio.mediumThreshold))m")
+                            Image(systemName: "volume.2")
+                                .foregroundColor(.blue)
+                                .accessibility(hidden: true)
+                            Text("Volume: \(Int(settings.spatialAudio.volume * 100))%")
                         }
-                        Slider(value: $settings.spatialAudio.mediumThreshold, in: 1.0...3.0, step: 0.1)
-                            .tint(.orange)
-                            .onChange(of: settings.spatialAudio.mediumThreshold) {
+                        Slider(value: Binding(
+                            get: { settings.spatialAudio.volume },
+                            set: { newValue in
+                                settings.spatialAudio.volume = newValue
                                 onSettingsChanged(settings)
                             }
-                    }
-                    .padding(.vertical, 4)
-                    
-                    VStack(alignment: .leading) {
-                        HStack {
-                            Text("Maximum detection distance:")
-                            Spacer()
-                            Text("\(String(format: "%.1f", settings.spatialAudio.maxDistance))m")
-                        }
-                        Slider(value: $settings.spatialAudio.maxDistance, in: 3.0...10.0, step: 0.5)
-                            .tint(.green)
-                            .onChange(of: settings.spatialAudio.maxDistance) {
-                                onSettingsChanged(settings)
-                            }
-                    }
-                    .padding(.vertical, 4)
-                }
-                
-                // Audio settings
-                Section(header: Text("Sound Settings")) {
-                    VStack(alignment: .leading) {
-                        HStack {
-                            Text("High pitch (near):")
-                            Spacer()
-                            Text("\(Int(settings.audioTones.highFrequency))Hz")
-                        }
-                        Slider(value: $settings.audioTones.highFrequency, in: 500...1200, step: 20)
+                        ), in: 0...1, step: 0.05)
                             .tint(.blue)
-                            .onChange(of: settings.audioTones.highFrequency) {
-                                onSettingsChanged(settings)
-                            }
+                            .accessibilityValue("\(Int(settings.spatialAudio.volume * 100)) percent")
+                            .disabled(!settings.spatialAudio.isEnabled)
                     }
                     .padding(.vertical, 4)
-                    
-                    VStack(alignment: .leading) {
-                        HStack {
-                            Text("Medium pitch (medium):")
-                            Spacer()
-                            Text("\(Int(settings.audioTones.mediumFrequency))Hz")
-                        }
-                        Slider(value: $settings.audioTones.mediumFrequency, in: 300...700, step: 20)
-                            .tint(.purple)
-                            .onChange(of: settings.audioTones.mediumFrequency) {
-                                onSettingsChanged(settings)
-                            }
-                    }
-                    .padding(.vertical, 4)
-                    
-                    VStack(alignment: .leading) {
-                        HStack {
-                            Text("Low pitch (far):")
-                            Spacer()
-                            Text("\(Int(settings.audioTones.lowFrequency))Hz")
-                        }
-                        Slider(value: $settings.audioTones.lowFrequency, in: 100...400, step: 20)
-                            .tint(.indigo)
-                            .onChange(of: settings.audioTones.lowFrequency) {
-                                onSettingsChanged(settings)
-                            }
-                    }
-                    .padding(.vertical, 4)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityHint("Adjust volume of spatial audio feedback")
+                } header: {
+                    Label("Spatial Audio", systemImage: "ear.and.waveform")
                 }
                 
                 // Haptic feedback settings
-                Section(header: Text("Haptic Feedback")) {
-                    Toggle("Enable Haptic Feedback", isOn: $settings.hapticFeedback.isEnabled)
-                        .tint(.blue)
-                        .onChange(of: settings.hapticFeedback.isEnabled) {
-                            onSettingsChanged(settings)
-                        }
+                Section {
+                    HStack {
+                        Image(systemName: "iphone.radiowaves.left.and.right")
+                            .foregroundColor(.blue)
+                            .accessibility(hidden: true)
+                        Toggle("Enable Haptic Feedback", isOn: $settings.hapticFeedback.isEnabled)
+                            .tint(.blue)
+                            .onChange(of: settings.hapticFeedback.isEnabled) { _, _ in
+                                onSettingsChanged(settings)
+                            }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityHint("Toggles vibration feedback for obstacle detection")
                     
                     // 振動を開始する距離の設定
                     VStack(alignment: .leading) {
                         HStack {
+                            Image(systemName: "ruler")
+                                .foregroundColor(.blue)
+                                .accessibility(hidden: true)
                             Text("Start Vibration at:")
                             Spacer()
                             Text("\(String(format: "%.1f", settings.hapticFeedback.startDistance))m")
                         }
-                        Slider(value: $settings.hapticFeedback.startDistance, in: 0.5...5.0, step: 0.1)
-                            .tint(.blue)
-                            .disabled(!settings.hapticFeedback.isEnabled)
-                            .onChange(of: settings.hapticFeedback.startDistance) {
+                        Slider(value: Binding(
+                            get: { settings.hapticFeedback.startDistance },
+                            set: { newValue in
+                                settings.hapticFeedback.startDistance = newValue
                                 onSettingsChanged(settings)
                             }
+                        ), in: 0.5...5.0, step: 0.1)
+                            .tint(.blue)
+                            .disabled(!settings.hapticFeedback.isEnabled)
+                            .accessibilityValue("\(String(format: "%.1f", settings.hapticFeedback.startDistance)) meters")
                     }
                     .padding(.vertical, 4)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityHint("Set the distance at which vibration feedback begins")
                     
                     // 説明文を追加
-                    Text("Haptic feedback intensity will increase naturally as you get closer to obstacles, based on human perception principles.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "info.circle")
+                            .foregroundColor(.secondary)
+                            .accessibility(hidden: true)
+                        Text("Haptic feedback intensity will increase naturally as you get closer to obstacles, based on human perception principles.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                } header: {
+                    Label("Haptic Feedback", systemImage: "waveform.path")
                 }
                 
                 // Reset settings button
@@ -163,11 +118,15 @@ struct AppSettingsView: View {
                     }) {
                         HStack {
                             Spacer()
+                            Image(systemName: "arrow.counterclockwise")
+                                .foregroundColor(.red)
                             Text("Reset Settings")
                                 .foregroundColor(.red)
+                                .fontWeight(.medium)
                             Spacer()
                         }
                     }
+                    .accessibilityHint("Resets all settings to their default values")
                 }
             }
             .navigationTitle("Settings")
