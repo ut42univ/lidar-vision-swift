@@ -71,6 +71,20 @@ final class AppSettings: ObservableObject, Codable {
         var useCoreHaptics: Bool = true
         var powerSavingMode: Bool = false
         var intensityMultiplier: Float = 1.0
+        var tooCloseDistance: Float = 0.5
+        
+        init(isEnabled: Bool = true, startDistance: Float = 3.0, nearIntensity: HapticIntensity = .heavy, mediumIntensity: HapticIntensity = .medium, nearInterval: TimeInterval = 0.1, mediumInterval: TimeInterval = 0.3, useCoreHaptics: Bool = true, powerSavingMode: Bool = false, intensityMultiplier: Float = 1.0, tooCloseDistance: Float = 0.5) {
+            self.isEnabled = isEnabled
+            self.startDistance = startDistance
+            self.nearIntensity = nearIntensity
+            self.mediumIntensity = mediumIntensity
+            self.nearInterval = nearInterval
+            self.mediumInterval = mediumInterval
+            self.useCoreHaptics = useCoreHaptics
+            self.powerSavingMode = powerSavingMode
+            self.intensityMultiplier = intensityMultiplier
+            self.tooCloseDistance = tooCloseDistance
+        }
         
         // 値の検証を追加
         mutating func validate() {
@@ -78,6 +92,26 @@ final class AppSettings: ObservableObject, Codable {
             nearInterval = max(0.05, min(0.5, nearInterval))
             mediumInterval = max(0.1, min(1, mediumInterval))
             intensityMultiplier = max(0.5, min(1.5, intensityMultiplier))
+            tooCloseDistance = max(0.1, min(1, tooCloseDistance))
+        }
+        
+        // デコード処理にデフォルト値を設定
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+            startDistance = try container.decodeIfPresent(Float.self, forKey: .startDistance) ?? 3.0
+            nearIntensity = try container.decodeIfPresent(HapticIntensity.self, forKey: .nearIntensity) ?? .heavy
+            mediumIntensity = try container.decodeIfPresent(HapticIntensity.self, forKey: .mediumIntensity) ?? .medium
+            nearInterval = try container.decodeIfPresent(TimeInterval.self, forKey: .nearInterval) ?? 0.1
+            mediumInterval = try container.decodeIfPresent(TimeInterval.self, forKey: .mediumInterval) ?? 0.3
+            useCoreHaptics = try container.decodeIfPresent(Bool.self, forKey: .useCoreHaptics) ?? true
+            powerSavingMode = try container.decodeIfPresent(Bool.self, forKey: .powerSavingMode) ?? false
+            intensityMultiplier = try container.decodeIfPresent(Float.self, forKey: .intensityMultiplier) ?? 1.0
+            tooCloseDistance = try container.decodeIfPresent(Float.self, forKey: .tooCloseDistance) ?? 0.5
+        }
+        
+        enum CodingKeys: String, CodingKey {
+            case isEnabled, startDistance, nearIntensity, mediumIntensity, nearInterval, mediumInterval, useCoreHaptics, powerSavingMode, intensityMultiplier, tooCloseDistance
         }
     }
     

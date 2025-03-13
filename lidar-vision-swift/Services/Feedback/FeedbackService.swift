@@ -342,6 +342,30 @@ final class FeedbackService {
         continuousPlayer = nil
     }
     
+    /// 近すぎる場合のフィードバックをトリガー
+    func triggerTooCloseFeedback() {
+        guard supportsHaptics, isActive, settings.hapticFeedback.isEnabled, engineRunning else {
+            return
+        }
+        
+        do {
+            let pattern = try createTooClosePattern()
+            let player = try engine?.makePlayer(with: pattern)
+            try player?.start(atTime: CHHapticTimeImmediate)
+        } catch {
+            print("Failed to trigger too close haptic feedback: \(error)")
+        }
+    }
+
+    private func createTooClosePattern() throws -> CHHapticPattern {
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
+        
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [sharpness, intensity], relativeTime: 0)
+        
+        return try CHHapticPattern(events: [event], parameters: [])
+    }
+    
     deinit {
         print("FeedbackService deinitializing")
         stopAll()

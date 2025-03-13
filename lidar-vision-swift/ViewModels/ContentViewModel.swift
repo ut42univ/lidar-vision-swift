@@ -203,6 +203,11 @@ final class ContentViewModel: ObservableObject {
     private func handleDepthChange(newDepth: Float) {
         // フィードバックサービスを通じて深度情報を更新
         feedbackService.updateFeedbackForDepth(newDepth)
+        
+        // 近すぎる場合のフィードバックを追加
+        if newDepth < appSettings.hapticFeedback.tooCloseDistance {
+            feedbackService.triggerTooCloseFeedback()
+        }
     }
     
     deinit {
