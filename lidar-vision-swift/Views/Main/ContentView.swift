@@ -14,11 +14,11 @@ struct ContentView: View {
     
     // MARK: - Design Constants
     private let buttonSize: CGFloat = 40
-    private let captureButtonSize: CGFloat = 72
+    private let captureButtonSize: CGFloat = 80
     private let barHeight: CGFloat = 8
-    private let barWidth: CGFloat = 80
+    private let barWidth: CGFloat = 96
     private let cornerRadius: CGFloat = 12
-    private let spacing: CGFloat = 14
+    private let spacing: CGFloat = 12
     private let standardPadding: CGFloat = 16
     
     var body: some View {
@@ -152,6 +152,7 @@ struct ContentView: View {
                 .fill(distanceGradient)
                 .frame(width: barWidth * distanceProgress, height: barHeight)
         }
+        .animation(.easeInOut, value: distanceProgress) // 距離バーのアニメーション
     }
     
     // Bottom control bar with camera button in center
@@ -161,17 +162,25 @@ struct ContentView: View {
                 VStack(spacing: 8) {
                     distanceBarIndicator
                     Text(distanceDescriptor)
+                        .fontWeight(.semibold)
                 }
                 Spacer()
-                Text(distanceValue)
+                HStack {
+                    Image(systemName: "ruler.fill")
+                        .foregroundColor(distanceValueColor)
+                    Text(distanceValue)
+                        .foregroundColor(distanceValueColor)
+                        .fontWeight(.semibold)
+                        .font(.title3)
+                }
             }
             cameraButton
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
+        .padding(.vertical, 16) // 下部を少し広めにする
         .padding(.horizontal, standardPadding)
         .background(blurBackground)
-        .cornerRadius(20)
+        .cornerRadius(20) // コーナー半径を上のボタンなどと合わせる
     }
     
     // Camera button (iOS Camera app style)
@@ -379,6 +388,17 @@ struct ContentView: View {
     private var distanceValue: String {
         let depth = viewModel.sessionService.centerDepth
         return String(format: "%.2f", depth) + "m"
+    }
+
+    private var distanceValueColor: Color {
+        let depth = viewModel.sessionService.centerDepth
+        if depth < 0.5 {
+            return .red
+        } else if depth < 1.5 {
+            return .orange
+        } else {
+            return .green
+        }
     }
 
     // MARK: - Actions
