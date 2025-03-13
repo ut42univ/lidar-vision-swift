@@ -16,8 +16,8 @@ struct ContentView: View {
     private let buttonSize: CGFloat = 40
     private let captureButtonSize: CGFloat = 80
     private let barHeight: CGFloat = 8
-    private let barWidth: CGFloat = 96
-    private let cornerRadius: CGFloat = 12
+    private let barWidth: CGFloat = 64
+    private let cornerRadius: CGFloat = 16
     private let spacing: CGFloat = 12
     private let standardPadding: CGFloat = 16
     
@@ -93,44 +93,34 @@ struct ContentView: View {
     // Grouped control buttons
     private var controlButtonGroup: some View {
         HStack(spacing: spacing) {
-            // Spatial audio toggle
-            ControlButton(
-                icon: viewModel.isSpatialAudioEnabled ? "airpodsmax" : "headphones", 
-                active: viewModel.isSpatialAudioEnabled,
-                accessibilityLabel: "Spatial Audio"
-            ) {
-                if (!viewModel.isSpatialAudioEnabled) {
-                    showAirPodsAlert = true
-                } else {
-                    viewModel.toggleSpatialAudio()
-                }
-            }
             
-            // Mesh visibility toggle
-            ControlButton(
-                icon: viewModel.isMeshVisible ? "grid.circle.fill" : "grid.circle", 
-                active: viewModel.isMeshVisible,
-                accessibilityLabel: "Toggle Mesh Visibility"
-            ) {
-                viewModel.toggleMeshVisibility()
-            }
             
             // Mesh reset button
-            ControlButton(
-                icon: "arrow.triangle.2.circlepath",
-                accessibilityLabel: "Reset Mesh"
-            ) {
-                viewModel.resetMeshCache()
-                hapticFeedback(style: .medium)
+            VStack(spacing: 4) {
+                ControlButton(
+                    icon: "arrow.triangle.2.circlepath",
+                    accessibilityLabel: "Reset Mesh"
+                ) {
+                    viewModel.resetMeshCache()
+                    hapticFeedback(style: .medium)
+                }
+                Text("Reset")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
             }
             
             // Settings button
-            ControlButton(
-                icon: "gear",
-                accessibilityLabel: "Settings"
-            ) {
-                viewModel.pauseARSession()
-                viewModel.showSettings = true
+            VStack(spacing: 4) {
+                ControlButton(
+                    icon: "gear",
+                    accessibilityLabel: "Settings"
+                ) {
+                    viewModel.pauseARSession()
+                    viewModel.showSettings = true
+                }
+                Text("Settings")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
             }
         }
         .padding(.horizontal, standardPadding)
@@ -159,16 +149,25 @@ struct ContentView: View {
     private var bottomControlBar: some View {
         ZStack {
             HStack(spacing: spacing) {
-                VStack(spacing: 8) {
-                    distanceBarIndicator
-                    Text(distanceDescriptor)
-                        .fontWeight(.semibold)
+                // Mesh visibility toggle
+                VStack {
+                    Button(action: {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        viewModel.toggleMeshVisibility()
+                    }) {
+                        Image(systemName: viewModel.isMeshVisible ? "cube.transparent.fill" : "cube.transparent")
+                            .font(.system(size: 32))
+                            .frame(width: 56, height: 56)
+                            .foregroundColor(viewModel.isMeshVisible ? .white : .white.opacity(0.9))
+                            .background(viewModel.isMeshVisible ? Color.secondary.opacity(0.8) : Color.clear)
+                            .clipShape(Circle())
+                    }
+                    .accessibilityLabel("Toggle Mesh Visibility")
                 }
                 .padding()
                 Spacer()
-                HStack {
-                    Image(systemName: "ruler.fill")
-                        .foregroundColor(distanceValueColor)
+                VStack {
+                    distanceBarIndicator
                     Text(distanceValue)
                         .foregroundColor(distanceValueColor)
                         .fontWeight(.semibold)
@@ -237,7 +236,7 @@ struct ContentView: View {
             }
 
             VStack(spacing: 25) {
-                Text("LiDAR Vision")
+                Text("What is LiDAR Vision?")
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(.primary)
                 
@@ -269,7 +268,7 @@ struct ContentView: View {
             }
             .padding(30)
             .background(
-                Color.white
+                Color(UIColor.systemBackground)
                     .cornerRadius(20)
                     .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 4)
             )
