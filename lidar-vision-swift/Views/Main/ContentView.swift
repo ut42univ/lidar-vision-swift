@@ -1,245 +1,406 @@
 import SwiftUI
 
-/// メイン画面 - リファクタリング版
+/// Modern Apple-style main screen UI with translucent blur-based design
 struct ContentView: View {
+    // MARK: - View Models & Environment
     @StateObject var viewModel = ContentViewModel()
     @StateObject var orientationHelper = OrientationHelper()
+    @Environment(\.colorScheme) var colorScheme
+    
+    // MARK: - UI State
     @State private var showAirPodsAlert = false
+    @State private var showHelp = false
+    @State private var captureScale: CGFloat = 1.0
+    
+    // MARK: - Design Constants
+    private let buttonSize: CGFloat = 40
+    private let captureButtonSize: CGFloat = 72
+    private let barHeight: CGFloat = 8
+    private let barWidth: CGFloat = 80
+    private let cornerRadius: CGFloat = 12
+    private let spacing: CGFloat = 14
+    private let standardPadding: CGFloat = 16
     
     var body: some View {
         ZStack {
+            // AR View
             arView
-            overlayControls
+            
+            // UI Overlays
+            VStack(spacing: 0) {
+                // Top controls
+                topControls
+                
+                Spacer()
+                
+                // Bottom control bar
+                bottomControlBar
+                    .padding(.bottom, standardPadding)
+            }
+            .padding(standardPadding)
+            
+            // Help overlay when active
+            if showHelp {
+                helpOverlay
+            }
         }
-        .overlay(centerMarker, alignment: .center)
-        .overlay(cameraButton, alignment: .bottomLeading)
         .presentationModifiers()
         .alert("3D Spatial Audio", isPresented: $showAirPodsAlert) {
             Button("OK") { viewModel.toggleSpatialAudio() }
         } message: {
             Text("Advanced spatial audio with head tracking is available when using AirPods or AirPods Pro. Basic spatial audio is available with any stereo headphones.")
         }
-        .onAppear { viewModel.resumeARSession() }
-        .onDisappear { viewModel.pauseARSession() }
+        .onAppear { 
+            viewModel.resumeARSession()
+        }
+        .onDisappear { 
+            viewModel.pauseARSession() 
+        }
         .environmentObject(viewModel)
     }
     
-    // コンポーネントを分割
+    // MARK: - Main Components
+    
+    // AR View Container
     private var arView: some View {
         ARViewContainer(sessionService: viewModel.sessionService)
             .ignoresSafeArea()
     }
     
-    private var overlayControls: some View {
-        VStack {
-            HeaderControls()
+    // Top control row
+    private var topControls: some View {
+        HStack {
+            // Help button
+            ControlButton(
+                icon: "questionmark.circle", 
+                accessibilityLabel: "Help"
+            ) {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                    showHelp.toggle()
+                }
+            }
+            .background(blurBackground)
+            .clipShape(Circle())
+            
             Spacer()
-            depthDisplay
+            
+            // Function button group
+            controlButtonGroup
         }
+        .padding(.top, standardPadding)
     }
     
-    private var depthDisplay: some View {
-        Text(String(format: "Distance: %.2f m", viewModel.sessionService.centerDepth))
-            .padding()
-            .background(Color.black.opacity(0.5))
-            .foregroundColor(.white)
-            .cornerRadius(8)
-            .padding(.bottom, 20)
-    }
-    
-    private var centerMarker: some View {
-        CrossMarker(color: .white)
-    }
-    
-    private var cameraButton: some View {
-        CameraButtonView()
-    }
-    
-    // MARK: - サブビュー
-    
-    // 上部コントロールボタンエリア
-    private struct HeaderControls: View {
-        @EnvironmentObject var viewModel: ContentViewModel
-        @State private var showAirPodsAlert = false
-        
-        var body: some View {
-            HStack(spacing: 10) {
-                // 設定ボタン
-                ControlButton(icon: "gear") {
-                    // 設定画面を表示する前に必ずARセッションを一時停止
-                    viewModel.pauseARSession()
-                    viewModel.showSettings = true
-                }
-                
-                // 空間オーディオ切り替えボタン
-                ControlButton(
-                    icon: viewModel.isSpatialAudioEnabled ? "airpodsmax" : "headphones",
-                    iconColor: viewModel.isSpatialAudioEnabled ? .green : .white
-                ) {
-                    if !viewModel.isSpatialAudioEnabled {
-                        showAirPodsAlert = true
-                    } else {
-                        viewModel.toggleSpatialAudio()
-                    }
-                }
-                
-                // メッシュ可視性切り替えボタン
-                ControlButton(
-                    icon: viewModel.isMeshVisible ? "grid.circle.fill" : "grid.circle"
-                ) {
-                    viewModel.toggleMeshVisibility()
-                }
-                
-                // メッシュリセットボタン
-                ControlButton(icon: "arrow.triangle.2.circlepath") {
-                    viewModel.resetMeshCache()
+    // Grouped control buttons
+    private var controlButtonGroup: some View {
+        HStack(spacing: spacing) {
+            // Spatial audio toggle
+            ControlButton(
+                icon: viewModel.isSpatialAudioEnabled ? "airpodsmax" : "headphones", 
+                active: viewModel.isSpatialAudioEnabled,
+                accessibilityLabel: "Spatial Audio"
+            ) {
+                if (!viewModel.isSpatialAudioEnabled) {
+                    showAirPodsAlert = true
+                } else {
+                    viewModel.toggleSpatialAudio()
                 }
             }
-            .padding()
+            
+            // Mesh visibility toggle
+            ControlButton(
+                icon: viewModel.isMeshVisible ? "grid.circle.fill" : "grid.circle", 
+                active: viewModel.isMeshVisible,
+                accessibilityLabel: "Toggle Mesh Visibility"
+            ) {
+                viewModel.toggleMeshVisibility()
+            }
+            
+            // Mesh reset button
+            ControlButton(
+                icon: "arrow.triangle.2.circlepath",
+                accessibilityLabel: "Reset Mesh"
+            ) {
+                viewModel.resetMeshCache()
+                hapticFeedback(style: .medium)
+            }
+            
+            // Settings button
+            ControlButton(
+                icon: "gear",
+                accessibilityLabel: "Settings"
+            ) {
+                viewModel.pauseARSession()
+                viewModel.showSettings = true
+            }
+        }
+        .padding(.horizontal, standardPadding)
+        .padding(.vertical, 10)
+        .background(blurBackground)
+        .cornerRadius(20)
+    }
+    
+    // Distance indicator bar (centered)
+    private var distanceBarIndicator: some View {
+        ZStack(alignment: .leading) {
+            // Background track
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(Color.white.opacity(0.3))
+                .frame(width: barWidth, height: barHeight)
+            
+            // Filled progress bar with color gradient
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(distanceGradient)
+                .frame(width: barWidth * distanceProgress, height: barHeight)
         }
     }
     
-    // 深度表示コンポーネント
-    private struct DistanceDisplay: View {
-        let depth: Float
-        
-        var body: some View {
-            Text(String(format: "Distance: %.2f m", depth))
-                .padding()
-                .background(Color.black.opacity(0.5))
-                .foregroundColor(.white)
-                .cornerRadius(8)
-                .padding(.bottom, 20)
-        }
-    }
-    
-    // カメラボタンコンポーネント
-    private struct CameraButtonView: View {
-        @EnvironmentObject var viewModel: ContentViewModel
-        
-        var body: some View {
-            VStack {
+    // Bottom control bar with camera button in center
+    private var bottomControlBar: some View {
+        ZStack {
+            HStack(spacing: spacing) {
+                VStack(spacing: 8) {
+                    distanceBarIndicator
+                    Text(distanceDescriptor)
+                }
                 Spacer()
-                HStack {
-                    cameraButton
-                    Spacer()
-                }
-                .padding()
+                Text(distanceValue)
             }
+            cameraButton
         }
-        
-        private var cameraButton: some View {
-            Image(systemName: "camera")
-                .font(.system(size: 24))
-                .frame(width: 60, height: 60)
-                .padding()
-                .background(Color.black.opacity(0.5))
-                .foregroundColor(.white)
-                .clipShape(Circle())
-                .gesture(
-                    LongPressGesture(minimumDuration: 0.5)
-                        .onEnded { _ in
-                            // 触覚フィードバック
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            
-                            // ARセッションを一時停止してから写真を撮影
-                            viewModel.pauseARSession()
-                            
-                            // 写真撮影と自動分析
-                            viewModel.captureAndAnalyzePhoto()
-                        }
-                )
-                .overlay(
-                    Circle()
-                        .stroke(Color.white, lineWidth: 2)
-                        .padding(4)
-                )
-        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .padding(.horizontal, standardPadding)
+        .background(blurBackground)
+        .cornerRadius(20)
     }
     
-    // コントロールボタンコンポーネント
-    private struct ControlButton: View {
-        let icon: String
-        var iconColor: Color = .white
-        let action: () -> Void
-        
-        var body: some View {
-            Button(action: action) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .frame(width: 40, height: 40)
-                    .background(Color.black.opacity(0.5))
-                    .foregroundColor(iconColor)
-                    .clipShape(Circle())
+    // Camera button (iOS Camera app style)
+    private var cameraButton: some View {
+        Button(action: capturePhoto) {
+            ZStack {
+                // Outer ring
+                Circle()
+                    .stroke(Color.white, lineWidth: 4)
+                    .frame(width: captureButtonSize, height: captureButtonSize)
+                
+                // Inner white button
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: captureButtonSize - 10, height: captureButtonSize - 10)
+                    .scaleEffect(captureScale)
             }
+            .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
         }
-    }
-}
-
-// MARK: - View拡張
-
-extension View {
-    /// 画面遷移モディファイアをまとめる
-    func presentationModifiers() -> some View {
-        self
-            .withPhotoDetailCover()
-            .withSettingsSheet()
-    }
-    
-    /// PhotoDetailのカバー表示を設定
-    private func withPhotoDetailCover() -> some View {
-        self.modifier(PhotoDetailModifier())
-    }
-    
-    /// Settingsのシート表示を設定
-    private func withSettingsSheet() -> some View {
-        self.modifier(SettingsSheetModifier())
-    }
-}
-
-// PhotoDetail表示モディファイア
-struct PhotoDetailModifier: ViewModifier {
-    @EnvironmentObject var viewModel: ContentViewModel
-    
-    func body(content: Content) -> some View {
-        content
-            .fullScreenCover(isPresented: $viewModel.showPhotoDetail, onDismiss: {
-                // 詳細画面を閉じたらARセッションを再開
-                viewModel.resumeARSession()
-            }) {
-                if let capturedImage = viewModel.capturedImage {
-                    PhotoDetailView(image: capturedImage)
-                        .onAppear {
-                            print("PhotoDetailView appeared")
-                        }
-                }
-            }
-    }
-}
-
-// Settings表示モディファイア
-struct SettingsSheetModifier: ViewModifier {
-    @EnvironmentObject var viewModel: ContentViewModel
-    
-    func body(content: Content) -> some View {
-        content
-            .sheet(isPresented: $viewModel.showSettings, onDismiss: {
-                // 設定画面を閉じたらARセッションを再開
-                print("Settings dismissed")
-                DispatchQueue.main.async {
-                    viewModel.resumeARSession()
-                }
-            }) {
-                AppSettingsView(
-                    settings: viewModel.appSettings,
-                    onSettingsChanged: { newSettings in
-                        viewModel.updateSettings(newSettings)
+        .accessibilityLabel("Capture Photo")
+        .onChange(of: captureScale) {
+            if captureScale < 1.0 {
+                // Reset scale after animation completes
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        captureScale = 1.0
                     }
-                )
-                .onAppear {
-                    print("AppSettingsView appeared")
                 }
             }
+        }
+    }
+    
+    // Help overlay
+    private var helpOverlay: some View {
+        ZStack {
+            if #available(iOS 15.0, *) {
+                Color.black.opacity(0.3).background(.thinMaterial)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                            showHelp = false
+                        }
+                    }
+            } else {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                            showHelp = false
+                        }
+                    }
+            }
+
+            VStack(spacing: 25) {
+                Text("LiDAR Vision")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.primary)
+                
+                VStack(alignment: .leading, spacing: 20) {
+                    helpItem(icon: "ruler", title: "Distance Indicator", description: "The bar shows distance to obstacles ahead")
+                    
+                    helpItem(icon: "camera", title: "Capture Photo", description: "Tap the button to analyze your surroundings")
+                    
+                    helpItem(icon: "airpodsmax", title: "Spatial Audio", description: "Detect distance and direction through sound")
+                    
+                    helpItem(icon: "gear", title: "Settings", description: "Customize the app to suit your preferences")
+                }
+                
+                Button(action: {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                        showHelp = false
+                    }
+                }) {
+                    Text("Close")
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 10)
+                        .background(Color.accentColor)
+                        .cornerRadius(cornerRadius)
+                }
+                .padding(.top, 10)
+                .accessibilityHint("Closes the help screen")
+            }
+            .padding(30)
+            .background(
+                Color.white
+                    .cornerRadius(20)
+                    .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 4)
+            )
+            .padding(24)
+            .transition(.asymmetric(
+                insertion: .scale(scale: 0.9).combined(with: .opacity).animation(.spring(response: 0.6, dampingFraction: 0.7)),
+                removal: .scale(scale: 0.95).combined(with: .opacity).animation(.spring(response: 0.5, dampingFraction: 0.7))
+            ))
+        }
+        .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+    }
+    
+    // Help item row
+    private func helpItem(icon: String, title: String, description: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundColor(Color.accentColor)
+                .frame(width: 28, height: 28)
+                .accessibilityHidden(true)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+    
+    // MARK: - Computed Properties
+    
+    // Background blur effect for controls
+    private var blurBackground: some View {
+        Group {
+            if #available(iOS 15.0, *) {
+                Color.clear.background(.ultraThinMaterial)
+            } else {
+                Color.black.opacity(0.4)
+            }
+        }
+    }
+    
+    // Distance progress value (0.0-1.0)
+    private var distanceProgress: CGFloat {
+        let depth = viewModel.sessionService.centerDepth
+        let maxDistance: CGFloat = 5.0
+        
+        // Calculate progress (closer = more filled)
+        let progress = 1.0 - min(CGFloat(depth) / maxDistance, 1.0)
+        
+        // Ensure minimum visibility
+        return max(progress, 0.05)
+    }
+    
+    // Distance text based on measured depth
+    private var distanceText: String {
+        let depth = viewModel.sessionService.centerDepth
+        
+        if depth < 0.5 {
+            return "Very Close: \(String(format: "%.2f", depth))m"
+        } else if depth < 1.5 {
+            return "Near: \(String(format: "%.2f", depth))m"
+        } else if depth < 3.0 {
+            return "Medium: \(String(format: "%.2f", depth))m"
+        } else {
+            return "Far: \(String(format: "%.2f", depth))m"
+        }
+    }
+    
+    // Gradient for distance indicator based on safety
+    private var distanceGradient: LinearGradient {
+        let depth = viewModel.sessionService.centerDepth
+        
+        if depth < 0.5 {
+            // Danger - red
+            return LinearGradient(
+                gradient: Gradient(colors: [Color.red, Color.red.opacity(0.8)]),
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        } else if depth < 1.0 {
+            // Warning - orange to yellow
+            return LinearGradient(
+                gradient: Gradient(colors: [Color.orange, Color.yellow]),
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        } else {
+            // Safe - green
+            return LinearGradient(
+                gradient: Gradient(colors: [Color.green.opacity(0.8), Color.green]),
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
+    }
+    
+    // Distance descriptor based on measured depth
+    private var distanceDescriptor: String {
+        let depth = viewModel.sessionService.centerDepth
+        if depth < 0.5 {
+            return "Very Close"
+        } else if depth < 1.5 {
+            return "Near"
+        } else if depth < 3.0 {
+            return "Medium"
+        } else {
+            return "Safe"
+        }
+    }
+
+    // Distance value based on measured depth
+    private var distanceValue: String {
+        let depth = viewModel.sessionService.centerDepth
+        return String(format: "%.2f", depth) + "m"
+    }
+
+    // MARK: - Actions
+    
+    // Capture photo action
+    private func capturePhoto() {
+        // Button animation
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
+            captureScale = 0.9
+        }
+        
+        // Haptic feedback
+        hapticFeedback(style: .medium)
+        
+        // Capture photo
+        viewModel.pauseARSession()
+        viewModel.captureAndAnalyzePhoto()
+    }
+    
+    // Generate haptic feedback
+    private func hapticFeedback(style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        UIImpactFeedbackGenerator(style: style).impactOccurred()
     }
 }
 
