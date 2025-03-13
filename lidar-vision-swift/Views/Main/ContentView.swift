@@ -164,6 +164,7 @@ struct ContentView: View {
                     Text(distanceDescriptor)
                         .fontWeight(.semibold)
                 }
+                .padding()
                 Spacer()
                 HStack {
                     Image(systemName: "ruler.fill")
@@ -171,8 +172,9 @@ struct ContentView: View {
                     Text(distanceValue)
                         .foregroundColor(distanceValueColor)
                         .fontWeight(.semibold)
-                        .font(.title3)
+                        .font(.system(.body, design: .monospaced))
                 }
+                .padding()
             }
             cameraButton
         }
