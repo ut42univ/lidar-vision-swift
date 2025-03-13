@@ -1,18 +1,17 @@
 import SwiftUI
 import Combine
 
-/// 写真詳細画面のViewModel
+/// Photo detail screen ViewModel - Streamlined for integrated view
 final class PhotoDetailViewModel: ObservableObject {
-    // 入力
+    // Input
     let image: UIImage
     
-    // 公開プロパティ（UI状態）
+    // Published properties (UI state)
     @Published var isAnalyzing = false
     @Published var analysisError: String? = nil
     @Published var autoPlay: Bool = true
-    @Published var showChatView = false
     
-    // サービスはプロパティとして保持（Dependency Injection用に初期化で注入可能に）
+    // Services as properties (injectable for testing)
     let openAIService: OpenAIService
     let speechService: TextToSpeechService
     
@@ -29,10 +28,10 @@ final class PhotoDetailViewModel: ObservableObject {
         self.openAIService = openAIService
         self.speechService = speechService
         
-        // サービスの状態変化を監視してプロパティに反映
+        // Monitor service state changes
         setupBindings()
         
-        // 画面表示時に自動分析
+        // Auto-analyze the image when view appears
         if autoAnalyze {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.analyzeImage()
@@ -41,34 +40,33 @@ final class PhotoDetailViewModel: ObservableObject {
     }
     
     private func setupBindings() {
-        // リアクティブにサービスの状態を追跡
+        // Track OpenAIService state reactively
         setupOpenAIServiceBindings()
         setupSpeechServiceBindings()
     }
     
     private func setupOpenAIServiceBindings() {
-        // OpenAIServiceの読み込み状態を追跡
+        // Track loading state
         openAIService.$isLoading
             .receive(on: RunLoop.main)
             .assign(to: \.isAnalyzing, on: self)
             .store(in: &cancellables)
         
-        // エラー状態を追跡
+        // Track error state
         openAIService.$error
             .receive(on: RunLoop.main)
-            .map { $0 } // 変換不要だがわかりやすく
             .assign(to: \.analysisError, on: self)
             .store(in: &cancellables)
         
-        // 分析完了時の処理
+        // Handle description updates
         openAIService.$imageDescription
-            .dropFirst() // 初期値をスキップ
-            .filter { !$0.isEmpty } // 空でない場合のみ
-            .throttle(for: .seconds(0.5), scheduler: RunLoop.main, latest: true) // 短時間の重複を防止
+            .dropFirst() // Skip initial empty value
+            .filter { !$0.isEmpty } // Only process non-empty descriptions
+            .throttle(for: .seconds(0.5), scheduler: RunLoop.main, latest: true) // Prevent rapid updates
             .sink { [weak self] description in
                 guard let self = self, !description.isEmpty else { return }
                 
-                // 自動読み上げが有効なら読み上げ開始
+                // Auto-speak if enabled
                 if self.autoPlay {
                     self.speechService.speak(text: description)
                 }
@@ -77,17 +75,16 @@ final class PhotoDetailViewModel: ObservableObject {
     }
     
     private func setupSpeechServiceBindings() {
-        // 必要に応じて音声サービスの状態を追跡
-        // この例では実装不要
+        // Additional speech service bindings if needed
     }
     
-    /// 画像の自動分析を開始
+    /// Start image analysis
     func analyzeImage() {
         print("Starting image analysis from ViewModel")
         openAIService.analyzeImage(image)
     }
     
-    /// 画像の説明を読み上げ
+    /// Toggle speak/stop for the image description
     func speakDescription() {
         if speechService.isPlaying {
             speechService.stopSpeaking()
@@ -96,26 +93,15 @@ final class PhotoDetailViewModel: ObservableObject {
         }
     }
     
-    /// 自動読み上げを切り替え
+    /// Toggle auto-play setting
     func toggleAutoPlay() {
         autoPlay.toggle()
         
-        // 状態に応じて適切な処理を実行
-        handleAutoPlayStateChange()
-    }
-    
-    private func handleAutoPlayStateChange() {
+        // Handle state change appropriately
         if autoPlay && !openAIService.imageDescription.isEmpty && !speechService.isPlaying {
             speakDescription()
         } else if !autoPlay && speechService.isPlaying {
             speechService.stopSpeaking()
-        }
-    }
-    
-    /// チャットビューの表示状態を切り替え
-    func toggleChatView() {
-        withAnimation {
-            showChatView.toggle()
         }
     }
     
@@ -125,7 +111,7 @@ final class PhotoDetailViewModel: ObservableObject {
             speechService.stopSpeaking()
         }
         
-        // サブスクリプションをキャンセル
+        // Cancel all subscriptions
         cancellables.forEach { $0.cancel() }
         cancellables.removeAll()
     }
@@ -133,19 +119,19 @@ final class PhotoDetailViewModel: ObservableObject {
 
 // MARK: - Computed Properties
 extension PhotoDetailViewModel {
-    // 現在の説明テキスト
+    // Current description text
     var description: String {
         openAIService.imageDescription
     }
     
-    // 分析ボタンを表示すべきかのフラグ
+    // Flag to show analyze button
     var shouldShowAnalyzeButton: Bool {
         return openAIService.imageDescription.isEmpty &&
                openAIService.error == nil &&
                !openAIService.isLoading
     }
     
-    // 読み上げボタンを表示すべきかのフラグ
+    // Flag to enable description playback
     var canPlayDescription: Bool {
         return !openAIService.imageDescription.isEmpty
     }
