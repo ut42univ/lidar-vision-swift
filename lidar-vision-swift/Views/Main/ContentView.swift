@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Modern Apple-style main screen UI with translucent blur-based design
+/// Modern main screen UI with consistent design system
 struct ContentView: View {
     // MARK: - View Models & Environment
     @StateObject var viewModel = ContentViewModel()
@@ -8,21 +8,26 @@ struct ContentView: View {
     @Environment(\.colorScheme) var colorScheme
     
     // MARK: - UI State
-    @State private var showAirPodsAlert = false
     @State private var showHelp = false
     @State private var captureScale: CGFloat = 1.0
     
-    // アニメーション用の状態
-    @State private var warningAngle: Double = 0
-    
-    // MARK: - Design Constants
-    private let buttonSize: CGFloat = 40
-    private let captureButtonSize: CGFloat = 80
-    private let barHeight: CGFloat = 8
-    private let barWidth: CGFloat = 64
-    private let cornerRadius: CGFloat = 16
-    private let spacing: CGFloat = 12
-    private let standardPadding: CGFloat = 16
+    // MARK: - Design System Constants
+    private enum DesignSystem {
+        // Sizing
+        static let buttonSize: CGFloat = 40
+        static let captureButtonSize: CGFloat = 80
+        static let standardCornerRadius: CGFloat = 20
+        static let controlBarCornerRadius: CGFloat = 24
+        static let standardSpacing: CGFloat = 12
+        static let standardPadding: CGFloat = 16
+        
+        // Distance Bar
+        static let barHeight: CGFloat = 8
+        static let barWidth: CGFloat = 64
+        
+        // Material
+        static let backgroundMaterial: Material = .ultraThinMaterial
+    }
     
     var body: some View {
         ZStack {
@@ -38,29 +43,24 @@ struct ContentView: View {
                 
                 // Bottom control bar
                 bottomControlBar
-                    .padding(.bottom, standardPadding)
+                    .padding(.bottom, DesignSystem.standardPadding)
             }
-            .padding(standardPadding)
+            .padding(DesignSystem.standardPadding)
             
-            // 近接警告表示 (条件付きで表示)
-            if viewModel.showProximityWarning {
+            // Conditionally show overlays, ensuring they don't appear simultaneously
+            if showHelp {
+                helpOverlay
+                    .zIndex(20) // Highest priority
+            } else if viewModel.showProximityWarning {
+                // 更新されたProximityWarningViewを使用
                 ProximityWarningView(distance: viewModel.currentDistance)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                    .zIndex(10) // 他の要素より前面に
-            }
-            
-            // Help overlay when active
-            if showHelp {
-                helpOverlay
+                    .zIndex(10)
             }
         }
         .presentationModifiers()
-        .alert("3D Spatial Audio", isPresented: $showAirPodsAlert) {
-            Button("OK") { viewModel.toggleSpatialAudio() }
-        } message: {
-            Text("Advanced spatial audio with head tracking is available when using AirPods or AirPods Pro. Basic spatial audio is available with any stereo headphones.")
-        }
+
         .onAppear {
             viewModel.resumeARSession()
         }
@@ -73,13 +73,13 @@ struct ContentView: View {
     
     // MARK: - Main Components
     
-    // AR View Container
+    /// AR View Container
     private var arView: some View {
         ARViewContainer(sessionService: viewModel.sessionService)
             .ignoresSafeArea()
     }
     
-    // Top control row
+    /// Top control row
     private var topControls: some View {
         HStack {
             // Help button
@@ -91,7 +91,7 @@ struct ContentView: View {
                     showHelp.toggle()
                 }
             }
-            .background(blurBackground)
+            .background(DesignSystem.backgroundMaterial)
             .clipShape(Circle())
             
             Spacer()
@@ -99,14 +99,12 @@ struct ContentView: View {
             // Function button group
             controlButtonGroup
         }
-        .padding(.top, standardPadding)
+        .padding(.top, DesignSystem.standardPadding)
     }
     
-    // Grouped control buttons
+    /// Grouped control buttons
     private var controlButtonGroup: some View {
-        HStack(spacing: spacing) {
-            
-            
+        HStack(spacing: DesignSystem.standardSpacing) {
             // Mesh reset button
             VStack(spacing: 4) {
                 ControlButton(
@@ -135,32 +133,32 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .padding(.horizontal, standardPadding)
+        .padding(.horizontal, DesignSystem.standardPadding)
         .padding(.vertical, 10)
-        .background(blurBackground)
-        .cornerRadius(20)
+        .background(DesignSystem.backgroundMaterial)
+        .cornerRadius(DesignSystem.standardCornerRadius)
     }
     
-    // Distance indicator bar (centered)
+    /// Distance indicator bar (centered)
     private var distanceBarIndicator: some View {
         ZStack(alignment: .leading) {
             // Background track
-            RoundedRectangle(cornerRadius: cornerRadius)
+            RoundedRectangle(cornerRadius: DesignSystem.standardCornerRadius)
                 .fill(Color.white.opacity(0.3))
-                .frame(width: barWidth, height: barHeight)
+                .frame(width: DesignSystem.barWidth, height: DesignSystem.barHeight)
             
             // Filled progress bar with color gradient
-            RoundedRectangle(cornerRadius: cornerRadius)
+            RoundedRectangle(cornerRadius: DesignSystem.standardCornerRadius)
                 .fill(distanceGradient)
-                .frame(width: barWidth * distanceProgress, height: barHeight)
+                .frame(width: DesignSystem.barWidth * distanceProgress, height: DesignSystem.barHeight)
         }
-        .animation(.easeInOut, value: distanceProgress) // 距離バーのアニメーション
+        .animation(.easeInOut, value: distanceProgress)
     }
     
-    // Bottom control bar with camera button in center
+    /// Bottom control bar with camera button in center
     private var bottomControlBar: some View {
         ZStack {
-            HStack(spacing: spacing) {
+            HStack(spacing: DesignSystem.standardSpacing) {
                 // Mesh visibility toggle
                 VStack {
                     Button(action: {
@@ -177,7 +175,9 @@ struct ContentView: View {
                     .accessibilityLabel("Toggle Mesh Visibility")
                 }
                 .padding()
+                
                 Spacer()
+                
                 VStack {
                     distanceBarIndicator
                     Text(distanceValue)
@@ -187,28 +187,29 @@ struct ContentView: View {
                 }
                 .padding()
             }
+            
             cameraButton
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16) // 下部を少し広めにする
-        .padding(.horizontal, standardPadding)
-        .background(blurBackground)
-        .cornerRadius(24) // コーナー半径を上のボタンなどと合わせる
+        .padding(.vertical, 16)
+        .padding(.horizontal, DesignSystem.standardPadding)
+        .background(DesignSystem.backgroundMaterial)
+        .cornerRadius(DesignSystem.controlBarCornerRadius)
     }
     
-    // Camera button (iOS Camera app style)
+    /// Camera button (iOS Camera app style)
     private var cameraButton: some View {
         Button(action: capturePhoto) {
             ZStack {
                 // Outer ring
                 Circle()
                     .stroke(Color.white, lineWidth: 4)
-                    .frame(width: captureButtonSize, height: captureButtonSize)
+                    .frame(width: DesignSystem.captureButtonSize, height: DesignSystem.captureButtonSize)
                 
                 // Inner white button
                 Circle()
                     .fill(Color.white)
-                    .frame(width: captureButtonSize - 10, height: captureButtonSize - 10)
+                    .frame(width: DesignSystem.captureButtonSize - 10, height: DesignSystem.captureButtonSize - 10)
                     .scaleEffect(captureScale)
             }
             .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
@@ -226,26 +227,17 @@ struct ContentView: View {
         }
     }
     
-    // Help overlay
+    /// Help overlay
     private var helpOverlay: some View {
         ZStack {
-            if #available(iOS 15.0, *) {
-                Color.black.opacity(0.3).background(.thinMaterial)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                            showHelp = false
-                        }
+            Color.black.opacity(0.3)
+                .background(DesignSystem.backgroundMaterial)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
+                        showHelp = false
                     }
-            } else {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                            showHelp = false
-                        }
-                    }
-            }
+                }
 
             VStack(spacing: 25) {
                 Text("What is LiDAR Vision?")
@@ -275,26 +267,22 @@ struct ContentView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 10)
                         .background(Color.accentColor)
-                        .cornerRadius(cornerRadius)
+                        .cornerRadius(DesignSystem.standardCornerRadius)
                 }
                 .padding(.top, 10)
                 .accessibilityHint("Closes the help screen")
             }
             .padding(30)
             .background(
-                Color(UIColor.systemBackground)
-                    .cornerRadius(24)
+                RoundedRectangle(cornerRadius: DesignSystem.controlBarCornerRadius)
+                    .fill(Color(.systemBackground).opacity(0.9))
             )
             .padding(24)
-            .transition(.asymmetric(
-                insertion: .scale(scale: 0.9).combined(with: .opacity).animation(.spring(response: 0.6, dampingFraction: 0.7)),
-                removal: .scale(scale: 0.95).combined(with: .opacity).animation(.spring(response: 0.5, dampingFraction: 0.7))
-            ))
+            .transition(.scale(scale: 0.9).combined(with: .opacity))
         }
-        .transition(.opacity.animation(.easeInOut(duration: 0.3)))
     }
     
-    // Help item row
+    /// Help item row
     private func helpItem(icon: String, title: String, description: String) -> some View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: icon)
@@ -318,12 +306,7 @@ struct ContentView: View {
     
     // MARK: - Computed Properties
     
-    // Background blur effect for controls
-    private var blurBackground: some View {
-        Color.clear.background(.ultraThinMaterial)
-    }
-    
-    // Distance progress value (0.0-1.0)
+    /// Distance progress value (0.0-1.0)
     private var distanceProgress: CGFloat {
         let depth = viewModel.sessionService.centerDepth
         let maxDistance: CGFloat = 5.0
@@ -335,22 +318,7 @@ struct ContentView: View {
         return max(progress, 0.05)
     }
     
-    // Distance text based on measured depth
-    private var distanceText: String {
-        let depth = viewModel.sessionService.centerDepth
-        
-        if depth < 0.5 {
-            return "Very Close: \(String(format: "%.2f", depth))m"
-        } else if depth < 1.5 {
-            return "Near: \(String(format: "%.2f", depth))m"
-        } else if depth < 3.0 {
-            return "Medium: \(String(format: "%.2f", depth))m"
-        } else {
-            return "Far: \(String(format: "%.2f", depth))m"
-        }
-    }
-    
-    // Gradient for distance indicator based on safety
+    /// Gradient for distance indicator based on safety
     private var distanceGradient: LinearGradient {
         let depth = viewModel.sessionService.centerDepth
         
@@ -378,26 +346,13 @@ struct ContentView: View {
         }
     }
     
-    // Distance descriptor based on measured depth
-    private var distanceDescriptor: String {
-        let depth = viewModel.sessionService.centerDepth
-        if depth < 0.5 {
-            return "Very Close"
-        } else if depth < 1.5 {
-            return "Near"
-        } else if depth < 3.0 {
-            return "Medium"
-        } else {
-            return "Safe"
-        }
-    }
-
-    // Distance value based on measured depth
+    /// Distance value display with proper formatting
     private var distanceValue: String {
         let depth = viewModel.sessionService.centerDepth
         return String(format: "%.2f", depth) + "m"
     }
 
+    /// Color for distance value based on safety threshold
     private var distanceValueColor: Color {
         let depth = viewModel.sessionService.centerDepth
         if depth < 0.5 {
@@ -411,7 +366,7 @@ struct ContentView: View {
 
     // MARK: - Actions
     
-    // Capture photo action
+    /// Capture photo action
     private func capturePhoto() {
         // Button animation
         withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
@@ -426,7 +381,7 @@ struct ContentView: View {
         viewModel.captureAndAnalyzePhoto()
     }
     
-    // Generate haptic feedback
+    /// Generate haptic feedback
     private func hapticFeedback(style: UIImpactFeedbackGenerator.FeedbackStyle) {
         UIImpactFeedbackGenerator(style: style).impactOccurred()
     }

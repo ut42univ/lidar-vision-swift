@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 洗練された近接警告表示コンポーネント
+/// 洗練された近接警告表示コンポーネント - メインビューのデザインシステムと統一
 struct ProximityWarningView: View {
     // アニメーション用の状態変数
     @State private var pulseScale: CGFloat = 0.95
@@ -12,6 +12,13 @@ struct ProximityWarningView: View {
     
     // 距離情報
     var distance: Float
+    
+    // デザイン定数
+    private enum Design {
+        static let containerSize: CGFloat = 240
+        static let cornerRadius: CGFloat = 24
+        static let backgroundMaterial: Material = .ultraThinMaterial
+    }
     
     var body: some View {
         ZStack {
@@ -34,15 +41,13 @@ struct ProximityWarningView: View {
         }
     }
     
-    // 背景ブラー
+    // 背景ブラー - ContentViewのマテリアルスタイルに完全に合わせる
     private var backgroundBlur: some View {
-        RoundedRectangle(cornerRadius: 24)
-            .fill(Color.white.opacity(0.1))
-            .frame(width: 240, height: 240)
-            .background(
-                Color.clear.background(.ultraThinMaterial)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 24))
+        RoundedRectangle(cornerRadius: Design.cornerRadius)
+            .fill(Color.clear)
+            .frame(width: Design.containerSize, height: Design.containerSize)
+            .background(Design.backgroundMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: Design.cornerRadius))
     }
     
     // 警告コンテンツ
@@ -121,12 +126,10 @@ struct ProximityWarningView: View {
     }
 }
 
-// 簡易プレビュー用
-struct ProximityWarningView_Previews: PreviewProvider {
-    static var previews: some View {
-        ZStack {
-            Color.gray.opacity(0.3).edgesIgnoringSafeArea(.all)
-            ProximityWarningView(distance: 0.18)
-        }
+// プレビュー
+#Preview {
+    ZStack {
+        Color.gray.opacity(0.3).edgesIgnoringSafeArea(.all)
+        ProximityWarningView(distance: 0.18)
     }
 }
