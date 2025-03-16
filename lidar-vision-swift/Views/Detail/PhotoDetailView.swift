@@ -14,7 +14,7 @@ struct PhotoDetailView: View {
 
     // UI State
     @State private var messageText: String = ""
-    @State private var isKeyboardVisible = false
+    @State private var keyboardHeight: CGFloat = 0
     @State private var isRecording: Bool = false
     @State private var scrollToBottom: Bool = false
     @State private var speechRecognizer = SpeechRecognizer()
@@ -39,8 +39,12 @@ struct PhotoDetailView: View {
                 conversationSection
             }
         }
-        .onTapGesture { isInputFocused = false }
-        .onAppear { addKeyboardObservers() }
+        .onTapGesture {
+            isInputFocused = false
+        }
+        .onAppear {
+            addKeyboardObservers()
+        }
         .onDisappear {
             cleanup()
             removeKeyboardObservers()
@@ -54,7 +58,7 @@ struct PhotoDetailView: View {
                 sendMessage()
             }
         }
-        .onChange(of: viewModel.openAIService.messages.count) {
+        .onChange(of: viewModel.openAIService.messages.count) { _, _ in
             scrollToBottom.toggle()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -64,47 +68,41 @@ struct PhotoDetailView: View {
 
     // MARK: - Top Control Bar
     private var topControlBar: some View {
-        HStack {
-            Button(action: dismiss.callAsFunction) {
-                HStack(spacing: 8) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    Text("Back")
-                        .font(.system(.body, design: .rounded).weight(.medium))
+        ZStack {
+            // Back button (left aligned)
+            HStack {
+                Button(action: dismiss.callAsFunction) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        Text("Back")
+                            .font(.system(.body, design: .rounded).weight(.medium))
+                    }
+                    .foregroundColor(.accentColor)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 14)
+                    .background(thinMaterialBackground)
+                    .cornerRadius(20)
                 }
-                .foregroundColor(.accentColor)
-                .padding(.vertical, 12)
-                .padding(.horizontal, 16)
-                .background(thinMaterialBackground)
-                .cornerRadius(25)
+                .accessibilityLabel("Go back")
+                .accessibilityHint("Returns to the camera view")
+
+                Spacer()
             }
-            .accessibilityLabel("Go back")
-
-            Spacer()
-
+            
+            // Title (center aligned)
             Text("AI Vision Analysis")
                 .font(.headline)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: UIScreen.main.bounds.width * 0.6) // Limit width for larger screens
                 .accessibilityAddTraits(.isHeader)
-
-            Spacer()
-
-            Button(action: {
-                viewModel.toggleAutoPlay()
-                hapticFeedback(.light)
-            }) {
-                Image(systemName: viewModel.autoPlay ? "speaker.wave.2.fill" : "speaker.wave.2")
-                    .font(.system(size: 18, design: .rounded))
-                    .foregroundColor(viewModel.autoPlay ? .accentColor : .gray)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 16)
-                    .background(thinMaterialBackground)
-                    .cornerRadius(25)
-            }
-            .disabled(viewModel.openAIService.imageDescription.isEmpty)
-            .accessibilityLabel("Toggle Auto Play")
+                .accessibilityIdentifier("screenTitle")
         }
         .padding(.horizontal, standardPadding)
-        .padding(.vertical, 20) // 上下の余白を拡大
+        .padding(.top, 16)
+        .padding(.bottom, 12)
     }
 
     // MARK: - Image Section
@@ -178,27 +176,41 @@ struct PhotoDetailView: View {
                         Spacer()
                     }
                 } else {
-                    ScrollViewReader { scrollView in
-                        ScrollView {
-                            LazyVStack(spacing: 16) {
-                                imageSection
-                                ForEach(viewModel.openAIService.messages) { message in
-                                    MessageBubble(message: message,
-                                                  speechService: viewModel.speechService)
-                                        .padding(.horizontal, 10)
-                                }
-                                Color.clear.frame(height: 1).id("bottomAnchor")
-                            }
-                            .padding(.top, standardPadding)
-                            .padding(.bottom, 8)
-                        }
-                        .coordinateSpace(name: "chatScroll")
-                        .onChange(of: scrollToBottom) {
-                            withAnimation { scrollView.scrollTo("bottomAnchor", anchor: .bottom) }
-                        }
-                    }
-                    
+                    chatScrollView
                     messageInputBar
+                }
+            }
+        }
+    }
+
+    // MARK: - Chat Scroll View
+    private var chatScrollView: some View {
+        ScrollViewReader { scrollView in
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    imageSection
+                    ForEach(viewModel.openAIService.messages) { message in
+                        MessageBubble(message: message,
+                                      speechService: viewModel.speechService)
+                            .padding(.horizontal, 10)
+                    }
+                    Color.clear.frame(height: 1).id("bottomAnchor")
+                }
+                .padding(.top, standardPadding)
+                .padding(.bottom, 8)
+            }
+            .coordinateSpace(name: "chatScroll")
+            .onChange(of: scrollToBottom) { _, _ in
+                withAnimation {
+                    scrollView.scrollTo("bottomAnchor", anchor: .bottom)
+                }
+            }
+            // キーボードが表示されたときに自動的に一番下にスクロール
+            .onChange(of: keyboardHeight) { newValue, _ in
+                if newValue > 0 {
+                    withAnimation {
+                        scrollView.scrollTo("bottomAnchor", anchor: .bottom)
+                    }
                 }
             }
         }
@@ -212,6 +224,7 @@ struct PhotoDetailView: View {
                 .frame(height: 0.5)
                 .padding(.horizontal, 10)
             HStack(spacing: 12) {
+                // 入力フィールド
                 ZStack(alignment: .trailing) {
                     TextField("Ask about this image...", text: $messageText)
                         .padding(.horizontal, 16)
@@ -226,6 +239,12 @@ struct PhotoDetailView: View {
                         .focused($isInputFocused)
                         .disabled(viewModel.openAIService.isLoading || isRecording)
                         .font(.system(.body, design: .rounded))
+                        .submitLabel(.send) // Return キーを送信ボタンに
+                        .onSubmit {
+                            if !messageText.isEmpty && !viewModel.openAIService.isLoading && !isRecording {
+                                sendMessage()
+                            }
+                        }
                         .accessibilityLabel("Chat input field")
                     
                     if isRecording {
@@ -236,19 +255,22 @@ struct PhotoDetailView: View {
                             .accessibilityLabel("Recording in progress")
                     }
                 }
+
+                // マイクボタン
                 Button(action: toggleVoiceInput) {
                     Image(systemName: isRecording ? "mic.fill.badge.xmark" : "mic.fill")
-                        .font(.system(size: 20, design: .rounded))
+                        .font(.system(size: 22, design: .rounded))
                         .foregroundColor(.white)
-                        .padding(10)
+                        .padding(12)
                         .background(Circle().fill(isRecording ? Color.red : Color.blue))
                 }
                 .disabled(viewModel.openAIService.isLoading)
                 .accessibilityLabel(isRecording ? "Stop Recording" : "Start Recording")
                 
+                // 送信ボタン
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
                         .foregroundColor(.white)
                         .padding(12)
                         .background(
@@ -270,38 +292,45 @@ struct PhotoDetailView: View {
             .padding(.vertical, 10)
             
             if isRecording || viewModel.openAIService.isLoading {
-                HStack(spacing: 10) {
-                    if isRecording {
-                        HStack(spacing: 6) {
-                            Circle().fill(Color.red).frame(width: 6, height: 6)
-                            Text("Listening...")
-                                .font(.system(size: 13, design: .rounded).weight(.medium))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 12)
-                        .background(thinMaterialBackground)
-                        .cornerRadius(15)
-                        .accessibilityLabel("Voice recognition active")
-                    }
-                    if viewModel.openAIService.isLoading {
-                        HStack(spacing: 8) {
-                            ProgressView().scaleEffect(0.7)
-                            Text("AI is thinking...")
-                                .font(.system(size: 13, design: .rounded).weight(.medium))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 12)
-                        .background(thinMaterialBackground)
-                        .cornerRadius(15)
-                        .accessibilityLabel("AI is analyzing or responding")
-                    }
+                statusBar
+            }
+            
+            // キーボードの高さに合わせたスペーサー
+            Spacer().frame(height: keyboardHeight > 0 ? 0 : 12)
+        }
+    }
+    
+    // ステータスバー
+    private var statusBar: some View {
+        HStack(spacing: 10) {
+            if isRecording {
+                HStack(spacing: 6) {
+                    Circle().fill(Color.red).frame(width: 6, height: 6)
+                    Text("Listening...")
+                        .font(.system(size: 13, design: .rounded).weight(.medium))
+                        .foregroundColor(.secondary)
                 }
                 .padding(.vertical, 4)
+                .padding(.horizontal, 12)
+                .background(thinMaterialBackground)
+                .cornerRadius(15)
+                .accessibilityLabel("Voice recognition active")
             }
-            Color.clear.frame(height: isKeyboardVisible ? 0 : 12)
+            if viewModel.openAIService.isLoading {
+                HStack(spacing: 8) {
+                    ProgressView().scaleEffect(0.7)
+                    Text("AI is thinking...")
+                        .font(.system(size: 13, design: .rounded).weight(.medium))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 4)
+                .padding(.horizontal, 12)
+                .background(thinMaterialBackground)
+                .cornerRadius(15)
+                .accessibilityLabel("AI is analyzing or responding")
+            }
         }
+        .padding(.vertical, 4)
     }
 
     // MARK: - Thin Material Background
@@ -349,15 +378,85 @@ struct PhotoDetailView: View {
         UIImpactFeedbackGenerator(style: style).impactOccurred()
     }
 
-    // MARK: - Keyboard Handling
+    // MARK: - Keyboard Handling - 改善版
     private func addKeyboardObservers() {
         let notificationCenter = NotificationCenter.default
-        notificationCenter.addObserver(forName: UIResponder.keyboardWillShowNotification,
-                                       object: nil,
-                                       queue: .main) { _ in withAnimation { isKeyboardVisible = true } }
-        notificationCenter.addObserver(forName: UIResponder.keyboardWillHideNotification,
-                                       object: nil,
-                                       queue: .main) { _ in withAnimation { isKeyboardVisible = false } }
+        
+        // キーボード表示の処理を最適化
+        notificationCenter.addObserver(
+            forName: UIResponder.keyboardWillShowNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            // キーボードサイズを取得
+            if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                // 安全エリアを考慮した高さの計算 - iOS 15以降に対応
+                let bottomPadding: CGFloat
+                if #available(iOS 15.0, *) {
+                    // iOS 15以降はUIWindowSceneを使用
+                    let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+                    bottomPadding = windowScene?.windows.first?.safeAreaInsets.bottom ?? 0
+                } else {
+                    // iOS 15未満は従来の方法を使用
+                    bottomPadding = UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 0
+                }
+                
+                // アニメーション情報を取得
+                if let animationDuration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval,
+                   let animationCurveValue = notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt {
+                    
+                    let animationCurve = UIView.AnimationCurve(rawValue: Int(animationCurveValue)) ?? .easeInOut
+                    
+                    // UIViewの標準アニメーションを使用して同期
+                    withAnimation(.timingCurve(
+                        animationCurve == .easeIn ? 0.42 : 0.0,
+                        animationCurve == .easeOut ? 0.58 : 0.0,
+                        animationCurve == .linear ? 1.0 : 0.5,
+                        animationCurve == .linear ? 1.0 : 1.0,
+                        duration: animationDuration
+                    )) {
+                        self.keyboardHeight = keyboardFrame.height - bottomPadding
+                        self.scrollToBottom.toggle()
+                    }
+                } else {
+                    // アニメーション情報がない場合はデフォルトで
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        self.keyboardHeight = keyboardFrame.height - bottomPadding
+                        self.scrollToBottom.toggle()
+                    }
+                }
+            }
+        }
+        
+        // キーボードが非表示になるときの処理も最適化
+        notificationCenter.addObserver(
+            forName: UIResponder.keyboardWillHideNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            // アニメーション情報を取得
+            if let animationDuration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval,
+               let animationCurveValue = notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt {
+                
+                let animationCurve = UIView.AnimationCurve(rawValue: Int(animationCurveValue)) ?? .easeInOut
+                
+                // UIViewの標準アニメーションを使用して同期
+                withAnimation(.timingCurve(
+                    animationCurve == .easeIn ? 0.42 : 0.0,
+                    animationCurve == .easeOut ? 0.58 : 0.0,
+                    animationCurve == .linear ? 1.0 : 0.5,
+                    animationCurve == .linear ? 1.0 : 1.0,
+                    duration: animationDuration
+                )) {
+                    self.keyboardHeight = 0
+                }
+            } else {
+                // アニメーション情報がない場合はデフォルトで
+                withAnimation(.easeOut(duration: 0.25)) {
+                    self.keyboardHeight = 0
+                }
+            }
+        }
     }
 
     private func removeKeyboardObservers() {

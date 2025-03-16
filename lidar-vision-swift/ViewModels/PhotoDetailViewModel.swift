@@ -72,10 +72,33 @@ final class PhotoDetailViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+            
+        // 新しいメッセージが来た時に自動読み上げ（最後のメッセージのみ）
+        openAIService.$messages
+            .dropFirst()
+            .filter { !$0.isEmpty }
+            .map { $0.last }
+            .compactMap { $0 }
+            .filter { !$0.isUser } // AIからのメッセージだけ
+            .throttle(for: .seconds(0.5), scheduler: RunLoop.main, latest: true)
+            .sink { [weak self] lastMessage in
+                guard let self = self, self.autoPlay else { return }
+                
+                // 既に再生中の場合は止めて、新しいメッセージを読む
+                if self.speechService.isPlaying {
+                    self.speechService.stopSpeaking()
+                }
+                
+                // 少し遅延を入れて読み上げ
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.speechService.speak(text: lastMessage.content)
+                }
+            }
+            .store(in: &cancellables)
     }
     
     private func setupSpeechServiceBindings() {
-        // Additional speech service bindings if needed
+        // 音声サービスの追加バインディング（必要に応じて）
     }
     
     /// Start image analysis
@@ -93,7 +116,7 @@ final class PhotoDetailViewModel: ObservableObject {
         }
     }
     
-    /// Toggle auto-play setting
+    /// UI上部のスピーカーマーク機能を撤去したので不要
     func toggleAutoPlay() {
         autoPlay.toggle()
         

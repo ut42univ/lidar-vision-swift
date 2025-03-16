@@ -3,7 +3,12 @@ import SwiftUI
 struct MessageBubble: View {
     let message: ChatMessage
     @ObservedObject var speechService: TextToSpeechService
-    @State private var isPlaying = false
+    
+    // isPlayingの状態を管理
+    @State private var isPlaying: Bool = false
+    
+    // アニメーション用の状態
+    @State private var buttonScale: CGFloat = 1.0
     
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -34,14 +39,32 @@ struct MessageBubble: View {
                             .font(.system(size: 10))
                             .foregroundColor(.secondary.opacity(0.7))
                         
-                        // Play button for AI messages
+                        // 再生・停止ボタン
                         Button(action: {
+                            // タップ時のアニメーション
+                            withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+                                buttonScale = 0.85
+                            }
+                            
+                            // 遅延を設けて元のサイズに戻す
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+                                    buttonScale = 1.0
+                                }
+                            }
+                            
+                            // 音声の再生・停止を切り替え
                             toggleSpeech(message.content)
                         }) {
                             Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
                                 .foregroundColor(.blue)
-                                .font(.system(size: 16))
+                                .font(.system(size: 22))
+                                .scaleEffect(buttonScale)
+                                .padding(4)
+                                .contentShape(Rectangle())
                         }
+                        .buttonStyle(PlainButtonStyle())
+                        .accessibilityLabel(isPlaying ? "Stop speaking" : "Play message")
                     }
                 }
                 .padding(.horizontal, 8)
@@ -85,23 +108,30 @@ struct MessageBubble: View {
         .frame(maxWidth: .infinity, alignment: message.isUser ? .trailing : .leading)
         .padding(.vertical, 4)
         .onAppear {
-            // Check play status when view appears
-            isPlaying = speechService.isPlaying && speechService.currentText == message.content
+            // 表示時に再生状態をチェック
+            updatePlayingState()
         }
-        .onChange(of: speechService.isPlaying) { newValue, _ in
-            // Update play status when speech service changes
-            isPlaying = newValue && speechService.currentText == message.content
+        .onChange(of: speechService.isPlaying) { _, _ in
+            // TextToSpeechServiceの状態変化を監視
+            updatePlayingState()
+        }
+        .onChange(of: speechService.currentText) { _, _ in
+            // テキスト変更時も状態を更新
+            updatePlayingState()
         }
     }
     
     private func toggleSpeech(_ text: String) {
         if isPlaying {
             speechService.stopSpeaking()
-            isPlaying = false
         } else {
             speechService.speak(text: text)
-            isPlaying = true
         }
+    }
+    
+    // 再生状態の更新を一箇所にまとめる
+    private func updatePlayingState() {
+        isPlaying = speechService.isPlaying && speechService.currentText == message.content
     }
     
     // Format timestamp to human-readable format
@@ -110,4 +140,19 @@ struct MessageBubble: View {
         formatter.timeStyle = .short
         return formatter.string(from: date)
     }
+}
+// プレビュー用の拡張
+#Preview {
+    VStack(spacing: 20) {
+        MessageBubble(
+            message: ChatMessage(content: "This is a test message from the user", isUser: true),
+            speechService: TextToSpeechService()
+        )
+        
+        MessageBubble(
+            message: ChatMessage(content: "This is a response from the AI assistant with a longer text that might wrap to multiple lines", isUser: false),
+            speechService: TextToSpeechService()
+        )
+    }
+    .padding()
 }
