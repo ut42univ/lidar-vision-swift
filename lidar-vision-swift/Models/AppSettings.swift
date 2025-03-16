@@ -71,9 +71,9 @@ final class AppSettings: ObservableObject, Codable {
         var useCoreHaptics: Bool = true
         var powerSavingMode: Bool = false
         var intensityMultiplier: Float = 1.0
-        var tooCloseDistance: Float = 0.5
+        var tooCloseDistance: Float = 0.25  // 0.5から0.25に変更
         
-        init(isEnabled: Bool = true, startDistance: Float = 3.0, nearIntensity: HapticIntensity = .heavy, mediumIntensity: HapticIntensity = .medium, nearInterval: TimeInterval = 0.1, mediumInterval: TimeInterval = 0.3, useCoreHaptics: Bool = true, powerSavingMode: Bool = false, intensityMultiplier: Float = 1.0, tooCloseDistance: Float = 0.5) {
+        init(isEnabled: Bool = true, startDistance: Float = 3.0, nearIntensity: HapticIntensity = .heavy, mediumIntensity: HapticIntensity = .medium, nearInterval: TimeInterval = 0.1, mediumInterval: TimeInterval = 0.3, useCoreHaptics: Bool = true, powerSavingMode: Bool = false, intensityMultiplier: Float = 1.0, tooCloseDistance: Float = 0.25) {  // 0.5から0.25に変更
             self.isEnabled = isEnabled
             self.startDistance = startDistance
             self.nearIntensity = nearIntensity
@@ -107,7 +107,7 @@ final class AppSettings: ObservableObject, Codable {
             useCoreHaptics = try container.decodeIfPresent(Bool.self, forKey: .useCoreHaptics) ?? true
             powerSavingMode = try container.decodeIfPresent(Bool.self, forKey: .powerSavingMode) ?? false
             intensityMultiplier = try container.decodeIfPresent(Float.self, forKey: .intensityMultiplier) ?? 1.0
-            tooCloseDistance = try container.decodeIfPresent(Float.self, forKey: .tooCloseDistance) ?? 0.5
+            tooCloseDistance = try container.decodeIfPresent(Float.self, forKey: .tooCloseDistance) ?? 0.25  // 0.5から0.25に変更
         }
         
         enum CodingKeys: String, CodingKey {

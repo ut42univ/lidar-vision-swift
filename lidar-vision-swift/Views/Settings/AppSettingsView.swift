@@ -97,12 +97,37 @@ struct AppSettingsView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityHint("Set the distance at which vibration feedback begins")
                     
+                    // 近すぎる距離の設定を追加
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.orange)
+                                .accessibility(hidden: true)
+                            Text("Too Close Warning at:")
+                            Spacer()
+                            Text("\(String(format: "%.2f", settings.hapticFeedback.tooCloseDistance))m")
+                        }
+                        Slider(value: Binding(
+                            get: { settings.hapticFeedback.tooCloseDistance },
+                            set: { newValue in
+                                settings.hapticFeedback.tooCloseDistance = newValue
+                                onSettingsChanged(settings)
+                            }
+                        ), in: 0.1...1.0, step: 0.05)
+                            .tint(.orange)
+                            .disabled(!settings.hapticFeedback.isEnabled)
+                            .accessibilityValue("\(String(format: "%.2f", settings.hapticFeedback.tooCloseDistance)) meters")
+                    }
+                    .padding(.vertical, 4)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityHint("Set the distance that triggers an urgent warning when obstacles are too close")
+                    
                     // 説明文を追加
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "info.circle")
                             .foregroundColor(.secondary)
                             .accessibility(hidden: true)
-                        Text("Haptic feedback intensity will increase naturally as you get closer to obstacles, based on human perception principles.")
+                        Text("Haptic feedback intensity will increase naturally as you get closer to obstacles. An urgent warning will trigger when obstacles are closer than the 'Too Close' threshold.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }

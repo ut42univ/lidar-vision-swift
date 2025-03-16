@@ -9,11 +9,13 @@ final class ContentViewModel: ObservableObject {
     @Published var showPhotoDetail = false
     @Published var showSettings = false
     @Published var appSettings: AppSettings
+    @Published var showProximityWarning = false // 近接警告の表示状態
+    @Published var currentDistance: Float = 10.0 // 現在の距離（警告表示用）
     
     // MARK: - Dependencies
     
     let sessionService: ARSessionService
-    private let feedbackService: FeedbackService
+    private let hapticFeedbackService: HapticFeedbackService
     private let spatialAudioService: SpatialAudioService
     
     // MARK: - Properties
@@ -24,7 +26,7 @@ final class ContentViewModel: ObservableObject {
     
     init(
         sessionService: ARSessionService? = nil,
-        feedbackService: FeedbackService? = nil,
+        hapticFeedbackService: HapticFeedbackService? = nil,
         spatialAudioService: SpatialAudioService? = nil
     ) {
         // 設定をロード
@@ -33,7 +35,7 @@ final class ContentViewModel: ObservableObject {
         
         // 依存サービスの初期化
         self.spatialAudioService = spatialAudioService ?? SpatialAudioService(settings: loadedSettings)
-        self.feedbackService = feedbackService ?? FeedbackService(settings: loadedSettings)
+        self.hapticFeedbackService = hapticFeedbackService ?? HapticFeedbackService(settings: loadedSettings)
         self.sessionService = sessionService ?? ARSessionService(
             spatialAudioService: self.spatialAudioService
         )
@@ -44,7 +46,7 @@ final class ContentViewModel: ObservableObject {
         applyInitialSettings()
         
         // フィードバックサービスをアクティブ化
-        self.feedbackService.activateFeedback()
+        self.hapticFeedbackService.activate()
     }
     
     // MARK: - Setup Methods
@@ -101,7 +103,7 @@ final class ContentViewModel: ObservableObject {
         print("ContentViewModel: pauseARSession called")
         
         // フィードバックサービスを非アクティブ化
-        feedbackService.deactivateFeedback()
+        hapticFeedbackService.deactivate()
         
         // ARセッションを一時停止
         sessionService.pauseSession()
@@ -112,7 +114,7 @@ final class ContentViewModel: ObservableObject {
         print("ContentViewModel: resumeARSession called")
         
         // フィードバックサービスを再アクティブ化
-        feedbackService.activateFeedback()
+        hapticFeedbackService.activate()
         
         // ARセッションを再開
         sessionService.resumeSession()
@@ -121,7 +123,7 @@ final class ContentViewModel: ObservableObject {
     // 写真を撮影して自動分析
     func captureAndAnalyzePhoto() {
         // 撮影前にフィードバックを一時停止
-        feedbackService.stopAll()
+        hapticFeedbackService.stopAllFeedback()
         
         // セッションチェックと撮影プロセスを一元化
         ensureSessionAndCapture { success in
@@ -187,7 +189,7 @@ final class ContentViewModel: ObservableObject {
     // サービスに設定を反映
     private func updateServices() {
         spatialAudioService.updateSettings(appSettings)
-        feedbackService.updateSettings(appSettings)
+        hapticFeedbackService.updateSettings(appSettings)
         
         // 空間オーディオの状態を更新（必要な場合のみ）
         if sessionService.spatialAudioEnabled != appSettings.spatialAudio.isEnabled {
@@ -201,18 +203,23 @@ final class ContentViewModel: ObservableObject {
     }
     
     private func handleDepthChange(newDepth: Float) {
-        // フィードバックサービスを通じて深度情報を更新
-        feedbackService.updateFeedbackForDepth(newDepth)
+        // 現在の距離を保存
+        currentDistance = newDepth
         
-        // 近すぎる場合のフィードバックを追加
-        if newDepth < appSettings.hapticFeedback.tooCloseDistance {
-            feedbackService.triggerTooCloseFeedback()
+        // フィードバックサービスを通じて深度情報を更新
+        hapticFeedbackService.updateForDepth(newDepth)
+        
+        // 近接警告表示の状態を更新
+        let tooCloseThreshold = appSettings.hapticFeedback.tooCloseDistance
+        DispatchQueue.main.async {
+            // しきい値よりも近い場合に警告を表示
+            self.showProximityWarning = newDepth < tooCloseThreshold
         }
     }
     
     deinit {
         print("ContentViewModel deinitializing")
-        feedbackService.deactivateFeedback()
+        hapticFeedbackService.deactivate()
     }
 }
 

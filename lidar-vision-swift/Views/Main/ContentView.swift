@@ -12,6 +12,9 @@ struct ContentView: View {
     @State private var showHelp = false
     @State private var captureScale: CGFloat = 1.0
     
+    // アニメーション用の状態
+    @State private var warningAngle: Double = 0
+    
     // MARK: - Design Constants
     private let buttonSize: CGFloat = 40
     private let captureButtonSize: CGFloat = 80
@@ -39,6 +42,14 @@ struct ContentView: View {
             }
             .padding(standardPadding)
             
+            // 近接警告表示 (条件付きで表示)
+            if viewModel.showProximityWarning {
+                ProximityWarningView(distance: viewModel.currentDistance)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    .zIndex(10) // 他の要素より前面に
+            }
+            
             // Help overlay when active
             if showHelp {
                 helpOverlay
@@ -50,13 +61,14 @@ struct ContentView: View {
         } message: {
             Text("Advanced spatial audio with head tracking is available when using AirPods or AirPods Pro. Basic spatial audio is available with any stereo headphones.")
         }
-        .onAppear { 
+        .onAppear {
             viewModel.resumeARSession()
         }
-        .onDisappear { 
-            viewModel.pauseARSession() 
+        .onDisappear {
+            viewModel.pauseARSession()
         }
         .environmentObject(viewModel)
+        .animation(.easeInOut(duration: 0.3), value: viewModel.showProximityWarning)
     }
     
     // MARK: - Main Components
@@ -72,7 +84,7 @@ struct ContentView: View {
         HStack {
             // Help button
             ControlButton(
-                icon: "questionmark.circle", 
+                icon: "questionmark.circle",
                 accessibilityLabel: "Help"
             ) {
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
@@ -181,7 +193,7 @@ struct ContentView: View {
         .padding(.vertical, 16) // 下部を少し広めにする
         .padding(.horizontal, standardPadding)
         .background(blurBackground)
-        .cornerRadius(20) // コーナー半径を上のボタンなどと合わせる
+        .cornerRadius(24) // コーナー半径を上のボタンなどと合わせる
     }
     
     // Camera button (iOS Camera app style)
@@ -248,6 +260,8 @@ struct ContentView: View {
                     helpItem(icon: "airpodsmax", title: "Spatial Audio", description: "Detect distance and direction through sound")
                     
                     helpItem(icon: "gear", title: "Settings", description: "Customize the app to suit your preferences")
+                    
+                    helpItem(icon: "exclamationmark.triangle.fill", title: "Warning Alerts", description: "Visual and haptic alerts when obstacles are too close")
                 }
                 
                 Button(action: {
@@ -269,8 +283,7 @@ struct ContentView: View {
             .padding(30)
             .background(
                 Color(UIColor.systemBackground)
-                    .cornerRadius(20)
-                    .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 4)
+                    .cornerRadius(24)
             )
             .padding(24)
             .transition(.asymmetric(
@@ -307,13 +320,7 @@ struct ContentView: View {
     
     // Background blur effect for controls
     private var blurBackground: some View {
-        Group {
-            if #available(iOS 15.0, *) {
-                Color.clear.background(.ultraThinMaterial)
-            } else {
-                Color.black.opacity(0.4)
-            }
-        }
+        Color.clear.background(.ultraThinMaterial)
     }
     
     // Distance progress value (0.0-1.0)
